@@ -1,0 +1,213 @@
+Build a full-stack mobile application:
+
+"Intelligent Mobile Application for Real-Time NAMASTE–ICD-11 Clinical Mapping"
+
+Tech Stack:
+
+* Frontend: React Native (Expo)
+* Backend: Node.js + Express
+* Database: PostgreSQL
+* AI Service: Python (FastAPI)
+* NLP Model: BioBERT (via HuggingFace Transformers)
+* Similarity Search: FAISS
+* Output Standard: FHIR (JSON format)
+
+---
+
+CORE FUNCTIONALITY:
+The system takes clinical input (symptoms / NAMASTE terms) and returns the most relevant ICD-11 codes using semantic similarity powered by BioBERT embeddings and FAISS.
+
+---
+
+1. FRONTEND (React Native - Expo)
+
+Screens:
+
+* Login
+* Input Screen (Enter symptoms)
+* Results Screen
+* History Screen
+
+UI:
+
+* Input text box
+* Button: "Generate ICD Codes"
+* Show:
+
+  * ICD Code
+  * Description
+  * Confidence Score
+* Button: "Confirm & Save"
+
+---
+
+2. BACKEND (Node.js + Express)
+
+Routes:
+
+* POST /auth/login
+* POST /predict
+* POST /save
+* GET /history
+
+Responsibilities:
+
+* Handle authentication (simple JWT)
+* Forward /predict request to Python AI service
+* Store results in PostgreSQL
+* Return FHIR formatted record
+
+---
+
+3. DATABASE (PostgreSQL)
+
+Tables:
+
+Users:
+
+* id
+* email
+* password
+
+Records:
+
+* id
+* user_id
+* input_text
+* selected_icd
+* fhir_json (JSONB)
+* created_at
+
+ICD_Codes:
+
+* code
+* description
+
+---
+
+4. AI SERVICE (FastAPI - Python)
+
+Use:
+
+* transformers library
+* model: "dmis-lab/biobert-base-cased-v1.1"
+* FAISS for similarity search
+
+Steps:
+
+1. Load BioBERT model + tokenizer
+2. Convert ICD descriptions into embeddings (store locally)
+3. Build FAISS index
+4. On input:
+
+   * Encode input text
+   * Search FAISS index
+   * Return top 5 matches
+
+API:
+POST /predict
+
+Input:
+{
+"text": "fever with chills"
+}
+
+Output:
+[
+{
+"code": "ICD-11-XXXX",
+"description": "Some disease",
+"score": 0.91
+}
+]
+
+---
+
+5. FAISS IMPLEMENTATION DETAILS:
+
+* Use IndexFlatL2
+* Store embeddings in memory (no need for GPU)
+* Precompute ICD embeddings at startup
+
+---
+
+6. FHIR OUTPUT FORMAT
+
+When user confirms a code, generate FHIR-like JSON:
+
+{
+"resourceType": "Condition",
+"subject": {
+"reference": "Patient/123"
+},
+"code": {
+"coding": [
+{
+"system": "ICD-11",
+"code": "XXXX",
+"display": "Disease Name"
+}
+]
+},
+"recordedDate": "timestamp"
+}
+
+Store this JSON in PostgreSQL.
+
+---
+
+7. SYSTEM FLOW:
+
+8. User inputs symptoms
+
+9. Frontend → Express (/predict)
+
+10. Express → FastAPI (BioBERT + FAISS)
+
+11. AI returns top matches
+
+12. Display results
+
+13. User selects one
+
+14. Backend generates FHIR JSON
+
+15. Save in PostgreSQL
+
+16. Show history
+
+---
+
+8. PROJECT STRUCTURE:
+
+/frontend (React Native)
+/backend (Express)
+/ai-service (FastAPI + BioBERT + FAISS)
+/database (PostgreSQL schema)
+
+---
+
+IMPORTANT OPTIMIZATION:
+
+* Use small ICD dataset (50–200 entries) for prototype
+* Precompute embeddings at startup
+* Avoid GPU dependency
+* Keep everything lightweight
+
+---
+
+GOAL:
+Working demo with:
+
+* Real AI (BioBERT)
+* Real similarity search (FAISS)
+* Real healthcare format (FHIR)
+
+---
+
+Start with:
+
+1. AI service (BioBERT + FAISS)
+2. Then backend
+3. Then frontend
+4. Then connect everything

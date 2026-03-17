@@ -5,7 +5,8 @@
  * NAMASTE-ICD11 Clinical Mapping API
  * OpenAPI spec version: 0.1.0
  */
+import type { FhirCoding } from "./fhirCoding";
 
-export interface HealthStatus {
-  status: string;
+export interface FhirCode {
+  coding: FhirCoding[];
 }

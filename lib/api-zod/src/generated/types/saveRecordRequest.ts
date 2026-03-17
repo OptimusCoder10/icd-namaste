@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface SaveRecordRequest {
+  input_text: string;
+  selected_icd: string;
+  icd_description: string;
+  confidence_score: number;
 }

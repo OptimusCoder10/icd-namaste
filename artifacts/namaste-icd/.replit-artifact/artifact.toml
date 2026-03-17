@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "NAMASTE-ICD11 Clinical Mapper"
+version = "1.0.0"
+id = "artifacts/namaste-icd"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+localPort = 20284
+name = "expo"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/namaste-icd run dev"
+
+[services.env]
+PORT = "20284"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/namaste-icd", "run", "build"]
+run = ["pnpm", "--filter", "@workspace/namaste-icd", "run", "serve"]

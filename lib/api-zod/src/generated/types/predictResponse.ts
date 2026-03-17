@@ -5,7 +5,9 @@
  * NAMASTE-ICD11 Clinical Mapping API
  * OpenAPI spec version: 0.1.0
  */
+import type { IcdMatch } from "./icdMatch";
 
-export interface HealthStatus {
-  status: string;
+export interface PredictResponse {
+  results: IcdMatch[];
+  ai_available: boolean;
 }

@@ -1,22 +1,26 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: NAMASTE-ICD11 Clinical Mapping API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: predict
+    description: ICD-11 code prediction
+  - name: records
+    description: Patient records
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +28,137 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /predict:
+    post:
+      operationId: predict
+      tags: [predict]
+      summary: Predict ICD-11 codes from clinical text
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PredictRequest"
+      responses:
+        "200":
+          description: Prediction results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /records:
+    post:
+      operationId: saveRecord
+      tags: [records]
+      summary: Save a confirmed ICD-11 record
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveRecordRequest"
+      responses:
+        "201":
+          description: Record saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Record"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: getHistory
+      tags: [records]
+      summary: Get history of saved records
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +168,205 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        name:
+          type: string
+      required:
+        - email
+        - password
+        - name
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - email
+        - name
+
+    PredictRequest:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
+
+    IcdMatch:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        score:
+          type: number
+          format: float
+      required:
+        - code
+        - description
+        - score
+
+    PredictResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/IcdMatch"
+        ai_available:
+          type: boolean
+      required:
+        - results
+        - ai_available
+
+    SaveRecordRequest:
+      type: object
+      properties:
+        input_text:
+          type: string
+        selected_icd:
+          type: string
+        icd_description:
+          type: string
+        confidence_score:
+          type: number
+          format: float
+      required:
+        - input_text
+        - selected_icd
+        - icd_description
+        - confidence_score
+
+    FhirCoding:
+      type: object
+      properties:
+        system:
+          type: string
+        code:
+          type: string
+        display:
+          type: string
+      required:
+        - system
+        - code
+        - display
+
+    FhirCode:
+      type: object
+      properties:
+        coding:
+          type: array
+          items:
+            $ref: "#/components/schemas/FhirCoding"
+      required:
+        - coding
+
+    FhirSubject:
+      type: object
+      properties:
+        reference:
+          type: string
+      required:
+        - reference
+
+    FhirCondition:
+      type: object
+      properties:
+        resourceType:
+          type: string
+        subject:
+          $ref: "#/components/schemas/FhirSubject"
+        code:
+          $ref: "#/components/schemas/FhirCode"
+        recordedDate:
+          type: string
+      required:
+        - resourceType
+        - subject
+        - code
+        - recordedDate
+
+    Record:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        input_text:
+          type: string
+        selected_icd:
+          type: string
+        icd_description:
+          type: string
+        confidence_score:
+          type: number
+          format: float
+        fhir_json:
+          $ref: "#/components/schemas/FhirCondition"
+        created_at:
+          type: string
+      required:
+        - id
+        - user_id
+        - input_text
+        - selected_icd
+        - icd_description
+        - confidence_score
+        - fhir_json
+        - created_at
+
+    RecordsResponse:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/Record"
+      required:
+        - records
