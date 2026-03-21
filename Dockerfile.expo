@@ -23,4 +23,4 @@ EXPOSE 3000
 
 ENV PORT=3000
 
-CMD ["pnpm", "--filter", "@workspace/namaste-icd", "run", "dev"]
+CMD ["sh", "-c", "cd artifacts/namaste-icd && EXPO_PUBLIC_DOMAIN=localhost:8080 pnpm exec expo start --web --port 3000"]
