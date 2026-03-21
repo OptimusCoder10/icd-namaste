@@ -18,8 +18,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const BASE_URL = process.env["EXPO_PUBLIC_DOMAIN"]
-  ? `https://${process.env["EXPO_PUBLIC_DOMAIN"]}/api`
+const domain = process.env["EXPO_PUBLIC_DOMAIN"];
+const BASE_URL = domain
+  ? domain.includes("localhost") || domain.includes("127.0.0.1")
+    ? `http://${domain}/api`
+    : `https://${domain}/api`
   : "/api";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
