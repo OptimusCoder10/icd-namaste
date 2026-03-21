@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@9 && apk add --no-cache netcat-openbsd
 
 WORKDIR /app
 
@@ -19,11 +19,9 @@ RUN pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 COPY lib/ ./lib/
 COPY artifacts/api-server/ ./artifacts/api-server/
 
-WORKDIR /app/lib/db
-RUN pnpm run push || true
-
-WORKDIR /app
+COPY entrypoint.api.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080
 
-CMD ["pnpm", "--filter", "@workspace/api-server", "run", "dev"]
+ENTRYPOINT ["/entrypoint.sh"]
