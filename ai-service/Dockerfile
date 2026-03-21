@@ -8,8 +8,9 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir fastapi uvicorn pydantic numpy faiss-cpu
 
-RUN pip install --no-cache-dir transformers torch --index-url https://download.pytorch.org/whl/cpu || \
-    echo "torch/transformers not installed, keyword fallback will be used"
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir transformers huggingface-hub || \
+    echo "WARNING: torch/transformers install failed, keyword fallback will be used"
 
 COPY main.py .
 

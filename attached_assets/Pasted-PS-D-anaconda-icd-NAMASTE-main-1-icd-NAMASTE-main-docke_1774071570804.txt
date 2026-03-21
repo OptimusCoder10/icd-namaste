@@ -1,0 +1,147 @@
+PS D:\anaconda\icd-NAMASTE-main (1)\icd-NAMASTE-main> docker-compose up --build
+time="2026-03-21T10:57:43+05:30" level=warning msg="D:\\anaconda\\icd-NAMASTE-main (1)\\icd-NAMASTE-main\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+[+] Running 12/12
+ ✔ postgres Pulled                                                                                               162.9s
+   ✔ 4a8dcc9ff6fd Pull complete                                                                                    1.6s
+   ✔ bf295aa7a64c Pull complete                                                                                  154.8s
+   ✔ 6b36925b3510 Pull complete                                                                                    1.3s
+   ✔ e0210f91556c Pull complete                                                                                    2.1s
+   ✔ d7ea68590de1 Pull complete                                                                                  158.6s
+   ✔ 385079160787 Pull complete                                                                                    1.6s
+   ✔ bfb0a9f61bdf Pull complete                                                                                  158.3s
+   ✔ d513847b8a76 Pull complete                                                                                    1.8s
+   ✔ dc66e2c13be5 Pull complete                                                                                    1.5s
+   ✔ fffbff44edaf Pull complete                                                                                    2.0s
+   ✔ 589002ba0eae Pull complete                                                                                  154.7s
+Compose can now delegate builds to bake for better performance.
+ To do so, set COMPOSE_BAKE=true.
+[+] Building 459.4s (52/52) FINISHED                                                               docker:desktop-linux
+ => [ai-service internal] load build definition from Dockerfile                                                    0.1s
+ => => transferring dockerfile: 487B                                                                               0.0s
+ => [ai-service internal] load metadata for docker.io/library/python:3.11-slim                                     2.9s
+ => [ai-service internal] load .dockerignore                                                                       0.1s
+ => => transferring context: 2B                                                                                    0.0s
+ => [ai-service 1/7] FROM docker.io/library/python:3.11-slim@sha256:9358444059ed78e2975ada2c189f1c1a3144a5dab6f3  24.3s
+ => => resolve docker.io/library/python:3.11-slim@sha256:9358444059ed78e2975ada2c189f1c1a3144a5dab6f35bff8c981afb  0.1s
+ => => sha256:7524aba74b8cc45ff3cf2f089fd9a638dfd58b001763194d0819c8d7c75d598f 250B / 250B                         0.5s
+ => => sha256:e35b92e2619d5152fbb45e6ccb02dbb1007c5784ad19a5e235bf05ca6e226a88 14.37MB / 14.37MB                  15.0s
+ => => sha256:6944007a5b45fe41656cd72b1691b1419bf9d39641e7afbc937f3a3abd07e575 1.29MB / 1.29MB                     2.0s
+ => => sha256:ec781dee3f4719c2ca0dd9e73cb1d4ed834ed1a406495eb6e44b6dfaad5d1f8f 29.78MB / 29.78MB                  20.9s
+ => => extracting sha256:ec781dee3f4719c2ca0dd9e73cb1d4ed834ed1a406495eb6e44b6dfaad5d1f8f                          1.4s
+ => => extracting sha256:6944007a5b45fe41656cd72b1691b1419bf9d39641e7afbc937f3a3abd07e575                          0.2s
+ => => extracting sha256:e35b92e2619d5152fbb45e6ccb02dbb1007c5784ad19a5e235bf05ca6e226a88                          1.2s
+ => => extracting sha256:7524aba74b8cc45ff3cf2f089fd9a638dfd58b001763194d0819c8d7c75d598f                          0.1s
+ => [ai-service internal] load build context                                                                       0.2s
+ => => transferring context: 10.61kB                                                                               0.0s
+ => [ai-service 2/7] WORKDIR /app                                                                                  3.4s
+ => [ai-service 3/7] RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*                 90.7s
+ => [ai-service 4/7] COPY requirements.txt .                                                                       0.2s
+ => [ai-service 5/7] RUN pip install --no-cache-dir fastapi uvicorn pydantic numpy faiss-cpu                      36.1s
+ => [ai-service 6/7] RUN pip install --no-cache-dir transformers torch --index-url https://download.pytorch.org/w  3.4s
+ => [ai-service 7/7] COPY main.py .                                                                                0.2s
+ => [ai-service] exporting to image                                                                               22.3s
+ => => exporting layers                                                                                           17.3s
+ => => exporting manifest sha256:ab122ca582d3f493ac978d69cc21b06c7cc540549861c7abfeb9dc33181cfdda                  0.1s
+ => => exporting config sha256:51595cfa860c3bcba8108fbc5a55da210d2b3df44ea4cba52cc919ef1a342904                    0.0s
+ => => exporting attestation manifest sha256:23ddb7a0ab776abad018443eea27a1a9b817cc51cd325d3e61d95dab72547b27      0.1s
+ => => exporting manifest list sha256:db1af1791f84f48f152dc2e6e7ec1077180a0bc58a365c88e82c25050f83bdd8             0.1s
+ => => naming to docker.io/library/icd-namaste-main-ai-service:latest                                              0.0s
+ => => unpacking to docker.io/library/icd-namaste-main-ai-service:latest                                           4.5s
+ => [ai-service] resolving provenance for metadata file                                                            0.1s
+ => [api-server internal] load build definition from Dockerfile.api                                                0.1s
+ => => transferring dockerfile: 775B                                                                               0.0s
+ => [expo-web internal] load metadata for docker.io/library/node:20-alpine                                         4.8s
+ => [api-server internal] load .dockerignore                                                                       0.1s
+ => => transferring context: 96B                                                                                   0.0s
+ => [api-server internal] load build context                                                                       0.4s
+ => => transferring context: 502.15kB                                                                              0.1s
+ => [expo-web  1/14] FROM docker.io/library/node:20-alpine@sha256:b88333c42c23fbd91596ebd7fd10de239cedab9617de04  24.4s
+ => => resolve docker.io/library/node:20-alpine@sha256:b88333c42c23fbd91596ebd7fd10de239cedab9617de04142dde7315e3  0.1s
+ => => sha256:9d10d4687fae6e13c052431ea3221ccda835c3262df3564310345ffe173146d9 445B / 445B                         0.6s
+ => => sha256:7ad115895a6aadccf7f98a05c33873c04df2933ba557c5bcdbedd3de612803da 1.26MB / 1.26MB                     1.6s
+ => => sha256:ed2fdcee5269a06b0b8b77c69867176443364a72a9626e9aa2e66ab1ebda35a7 43.22MB / 43.22MB                  20.5s
+ => => extracting sha256:ed2fdcee5269a06b0b8b77c69867176443364a72a9626e9aa2e66ab1ebda35a7                          3.0s
+ => => extracting sha256:7ad115895a6aadccf7f98a05c33873c04df2933ba557c5bcdbedd3de612803da                          0.1s
+ => => extracting sha256:9d10d4687fae6e13c052431ea3221ccda835c3262df3564310345ffe173146d9                          0.1s
+ => CACHED [expo-web  2/14] RUN npm install -g pnpm@9                                                              8.2s
+ => CACHED [expo-web  3/14] WORKDIR /app                                                                           0.3s
+ => [api-server  4/17] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./                                    0.2s
+ => [api-server  5/17] COPY tsconfig.base.json tsconfig.json ./                                                    0.2s
+ => [api-server  6/17] COPY lib/db/package.json ./lib/db/                                                          0.2s
+ => [api-server  7/17] COPY lib/api-spec/package.json ./lib/api-spec/                                              0.2s
+ => [api-server  8/17] COPY lib/api-zod/package.json ./lib/api-zod/                                                0.2s
+ => [api-server  9/17] COPY lib/api-client-react/package.json ./lib/api-client-react/                              0.2s
+ => [api-server 10/17] COPY artifacts/api-server/package.json ./artifacts/api-server/                              0.2s
+ => [api-server 11/17] COPY scripts/package.json ./scripts/                                                        0.2s
+ => [api-server 12/17] RUN pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile                    29.6s
+ => [api-server 13/17] COPY lib/ ./lib/                                                                            0.3s
+ => [api-server 14/17] COPY artifacts/api-server/ ./artifacts/api-server/                                          0.2s
+ => [api-server 15/17] WORKDIR /app/lib/db                                                                         0.2s
+ => [api-server 16/17] RUN pnpm run push || true                                                                   2.2s
+ => [api-server 17/17] WORKDIR /app                                                                                0.2s
+ => [api-server] exporting to image                                                                               32.9s
+ => => exporting layers                                                                                           18.9s
+ => => exporting manifest sha256:e693794f70c99567085e88ab9d337d90013def74fe8ac322888cbaf0e3f99c38                  0.1s
+ => => exporting config sha256:0f149d139ca364c740fcc5672cd4cc983fda9ecc1ef383ad59daabe56a230467                    0.1s
+ => => exporting attestation manifest sha256:0b8421267c2879124f17cfca61b2ff409b9df7f4eac56b11d7e389b0f3f32b15      0.1s
+ => => exporting manifest list sha256:aff2b761534c6a91eab5e1b6244c67b64cc587cecf82e16194957a5de4ca060c             0.1s
+ => => naming to docker.io/library/icd-namaste-main-api-server:latest                                              0.0s
+ => => unpacking to docker.io/library/icd-namaste-main-api-server:latest                                          13.4s
+ => [api-server] resolving provenance for metadata file                                                            0.1s
+ => [expo-web internal] load build definition from Dockerfile.expo                                                 0.1s
+ => => transferring dockerfile: 735B                                                                               0.0s
+ => [expo-web internal] load .dockerignore                                                                         0.1s
+ => => transferring context: 96B                                                                                   0.0s
+ => [expo-web internal] load build context                                                                         0.2s
+ => => transferring context: 513.35kB                                                                              0.1s
+ => CACHED [expo-web  4/14] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./                               0.0s
+ => CACHED [expo-web  5/14] COPY tsconfig.base.json tsconfig.json ./                                               0.0s
+ => [expo-web  6/14] COPY lib/api-client-react/package.json ./lib/api-client-react/                                2.7s
+ => [expo-web  7/14] COPY lib/api-zod/package.json ./lib/api-zod/                                                  0.3s
+ => [expo-web  8/14] COPY lib/api-spec/package.json ./lib/api-spec/                                                0.3s
+ => [expo-web  9/14] COPY lib/db/package.json ./lib/db/                                                            0.3s
+ => [expo-web 10/14] COPY artifacts/namaste-icd/package.json ./artifacts/namaste-icd/                              0.2s
+ => [expo-web 11/14] COPY scripts/package.json ./scripts/                                                          0.3s
+ => [expo-web 12/14] RUN pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile                      79.3s
+ => [expo-web 13/14] COPY lib/ ./lib/                                                                              1.0s
+ => [expo-web 14/14] COPY artifacts/namaste-icd/ ./artifacts/namaste-icd/                                          0.3s
+ => [expo-web] exporting to image                                                                                 81.6s
+ => => exporting layers                                                                                           37.4s
+ => => exporting manifest sha256:92fdb45a60fda3b5b1ae6cf9f682fcba93e95d0fbe9c0b9807fb119f0efd9a8e                  0.0s
+ => => exporting config sha256:0f09262b19b71c885bb54a8f195ca768aa0ff33510854742ec7d81aba0a82d2f                    0.0s
+ => => exporting attestation manifest sha256:f87ba2b264a12662d82202240e2ac311d715aab1b1908905c6363aac99804b23      0.1s
+ => => exporting manifest list sha256:4ba5720b67baaf2be2df58711bf1d491109349bd051150c65fd71f7b4d814453             0.1s
+ => => naming to docker.io/library/icd-namaste-main-expo-web:latest                                                0.0s
+ => => unpacking to docker.io/library/icd-namaste-main-expo-web:latest                                            43.7s
+ => [expo-web] resolving provenance for metadata file                                                              0.1s
+[+] Running 9/9
+ ✔ ai-service                               Built                                                                  0.0s
+ ✔ api-server                               Built                                                                  0.0s
+ ✔ expo-web                                 Built                                                                  0.0s
+ ✔ Network icd-namaste-main_default         Created                                                                0.3s
+ ✔ Volume "icd-namaste-main_postgres_data"  Created                                                                0.1s
+ ✔ Container icd-namaste-main-postgres-1    Created                                                                1.2s
+ ✔ Container icd-namaste-main-ai-service-1  Created                                                                1.2s
+ ✔ Container icd-namaste-main-api-server-1  Created                                                                1.0s
+ ✔ Container icd-namaste-main-expo-web-1    Created                                                                1.3s
+Attaching to ai-service-1, api-server-1, expo-web-1, postgres-1
+ai-service-1  | /app/main.py:193: DeprecationWarning:
+ai-service-1  |         on_event is deprecated, use lifespan event handlers instead.
+ai-service-1  |
+ai-service-1  |         Read more about it in the
+ai-service-1  |         [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+ai-service-1  |
+ai-service-1  |   @app.on_event("startup")
+ai-service-1  | INFO:     Started server process [1]
+ai-service-1  | INFO:     Waiting for application startup.
+ai-service-1  | INFO:     Application startup complete.
+ai-service-1  | INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+ai-service-1  | Loading BioBERT model...
+ai-service-1  | Could not load BioBERT: No module named 'transformers'. Using keyword fallback.
+ai-service-1  | INFO:     127.0.0.1:49622 - "GET /health HTTP/1.1" 200 OK
+ai-service-1  | INFO:     127.0.0.1:44590 - "GET /health HTTP/1.1" 200 OK
+ai-service-1  | INFO:     127.0.0.1:51656 - "GET /health HTTP/1.1" 200 OK
+ai-service-1  | INFO:     127.0.0.1:33836 - "GET /health HTTP/1.1" 200 OK
+ai-service-1  | INFO:     127.0.0.1:55186 - "GET /health HTTP/1.1" 200 OK
+Gracefully stopping... (press Ctrl+C again to force)
+Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint icd-namaste-main-postgres-1 (98bba55e2fb7332248e0e2efe227136f6dac29aa36fc65f5fa9cb52ba1bfda89): Bind for 0.0.0.0:5432 failed: port is already allocated
