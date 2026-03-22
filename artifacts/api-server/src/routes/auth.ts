@@ -24,10 +24,14 @@ router.post("/login", async (req: Request, res: Response) => {
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name }
+      user: { id: user.id, email: user.email, name: user.name, role: user.role }
     });
   } catch (err) {
     console.error("Login error:", err);
@@ -37,22 +41,27 @@ router.post("/login", async (req: Request, res: Response) => {
 
 router.post("/register", async (req: Request, res: Response) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, role } = req.body;
     if (!email || !password || !name) {
       res.status(400).json({ error: "Email, password, and name are required" });
       return;
     }
+    const validRole = role === "patient" ? "patient" : "doctor";
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     if (existing.length > 0) {
       res.status(400).json({ error: "User already exists" });
       return;
     }
     const password_hash = await bcrypt.hash(password, 10);
-    const [user] = await db.insert(usersTable).values({ email, name, password_hash }).returning();
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
+    const [user] = await db.insert(usersTable).values({ email, name, password_hash, role: validRole }).returning();
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
     res.status(201).json({
       token,
-      user: { id: user.id, email: user.email, name: user.name }
+      user: { id: user.id, email: user.email, name: user.name, role: user.role }
     });
   } catch (err) {
     console.error("Register error:", err);

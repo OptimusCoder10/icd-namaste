@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+export type UserRole = "doctor" | "patient";
+
 interface User {
   id: number;
   email: string;
   name: string;
+  role: UserRole;
 }
 
 interface AuthContextType {
@@ -12,7 +15,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -62,11 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (email: string, password: string, name: string, role: UserRole) => {
     const res = await fetch(`${BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, role }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Registration failed");

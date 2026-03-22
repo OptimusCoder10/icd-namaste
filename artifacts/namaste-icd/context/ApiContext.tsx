@@ -12,15 +12,17 @@ interface PredictResponse {
   ai_available: boolean;
 }
 
-interface Record {
+export interface RecordItem {
   id: number;
   user_id: number;
   input_text: string;
   selected_icd: string;
   icd_description: string;
   confidence_score: number;
+  doctor_confidence: number | null;
   fhir_json: object;
   created_at: string;
+  doctor_name?: string;
 }
 
 interface ApiContextType {
@@ -30,8 +32,9 @@ interface ApiContextType {
     selected_icd: string;
     icd_description: string;
     confidence_score: number;
-  }) => Promise<Record>;
-  getHistory: () => Promise<Record[]>;
+    doctor_confidence: number;
+  }) => Promise<RecordItem>;
+  getHistory: () => Promise<RecordItem[]>;
 }
 
 const ApiContext = createContext<ApiContextType | null>(null);
@@ -67,7 +70,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     selected_icd: string;
     icd_description: string;
     confidence_score: number;
-  }): Promise<Record> => {
+    doctor_confidence: number;
+  }): Promise<RecordItem> => {
     const res = await fetch(`${BASE_URL}/records`, {
       method: "POST",
       headers: authHeaders(),
@@ -78,7 +82,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     return data;
   };
 
-  const getHistory = async (): Promise<Record[]> => {
+  const getHistory = async (): Promise<RecordItem[]> => {
     const res = await fetch(`${BASE_URL}/records`, {
       headers: authHeaders(),
     });

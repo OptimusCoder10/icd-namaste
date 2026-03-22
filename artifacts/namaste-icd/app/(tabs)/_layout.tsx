@@ -10,15 +10,17 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 
 function NativeTabLayout() {
+  const { user } = useAuth();
+  const isPatient = user?.role === "patient";
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="input">
         <Icon sf={{ default: "waveform.path.ecg", selected: "waveform.path.ecg" }} />
-        <Label>Diagnose</Label>
+        <Label>{isPatient ? "Portal" : "Diagnose"}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="history">
         <Icon sf={{ default: "clock", selected: "clock.fill" }} />
-        <Label>History</Label>
+        <Label>{isPatient ? "Diagnoses" : "My Records"}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -46,6 +48,8 @@ function ClassicTabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const C = Colors.light;
+  const { user } = useAuth();
+  const isPatient = user?.role === "patient";
 
   return (
     <Tabs
@@ -82,24 +86,26 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="input"
         options={{
-          title: "Diagnose",
+          title: isPatient ? "Patient Portal" : "Diagnose",
+          tabBarLabel: isPatient ? "Portal" : "Diagnose",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="waveform.path.ecg" tintColor={color} size={24} />
             ) : (
-              <Feather name="activity" size={22} color={color} />
+              <Feather name={isPatient ? "user" : "activity"} size={22} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: "History",
+          title: isPatient ? "Diagnoses" : "My Records",
+          tabBarLabel: isPatient ? "Diagnoses" : "My Records",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="clock" tintColor={color} size={24} />
             ) : (
-              <Feather name="clock" size={22} color={color} />
+              <Feather name={isPatient ? "clipboard" : "clock"} size={22} color={color} />
             ),
         }}
       />

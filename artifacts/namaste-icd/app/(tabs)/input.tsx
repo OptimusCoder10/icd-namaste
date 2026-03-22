@@ -40,6 +40,8 @@ export default function InputScreen() {
   const { predict, saveRecord } = useApi();
   const C = Colors.light;
 
+  const isPatient = user?.role === "patient";
+
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export default function InputScreen() {
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
+  const [doctorConfidences, setDoctorConfidences] = useState<Record<string, number>>({});
 
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
@@ -69,10 +72,14 @@ export default function InputScreen() {
     setLoading(true);
     setResults([]);
     setSavedIds(new Set());
+    setDoctorConfidences({});
     try {
       const res = await predict(text.trim());
       setResults(res.results);
       setAiAvailable(res.ai_available);
+      const initial: Record<string, number> = {};
+      res.results.forEach(r => { initial[r.code] = Math.round(r.score * 100); });
+      setDoctorConfidences(initial);
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Prediction failed";
@@ -87,11 +94,13 @@ export default function InputScreen() {
     if (savedIds.has(match.code)) return;
     setSaving(match.code);
     try {
+      const dc = doctorConfidences[match.code] ?? Math.round(match.score * 100);
       await saveRecord({
         input_text: text.trim(),
         selected_icd: match.code,
         icd_description: match.description,
         confidence_score: match.score,
+        doctor_confidence: dc,
       });
       setSavedIds(prev => new Set([...prev, match.code]));
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -109,6 +118,49 @@ export default function InputScreen() {
     router.replace("/auth");
   };
 
+  const adjustConfidence = (code: string, delta: number) => {
+    setDoctorConfidences(prev => ({
+      ...prev,
+      [code]: Math.min(100, Math.max(0, (prev[code] ?? 50) + delta)),
+    }));
+  };
+
+  if (isPatient) {
+    return (
+      <View style={[styles.container, { backgroundColor: C.background }]}>
+        <View style={[
+          styles.content,
+          {
+            paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 16,
+            paddingBottom: insets.bottom + 16,
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+          }
+        ]}>
+          <View style={[styles.patientIcon, { backgroundColor: "#7C3AED15" }]}>
+            <Feather name="user" size={36} color="#7C3AED" />
+          </View>
+          <Text style={[styles.patientTitle, { color: C.text }]}>Patient Portal</Text>
+          <Text style={[styles.patientSubtitle, { color: C.textSecondary }]}>
+            Welcome, {user?.name?.split(" ")[0]}. View your diagnoses in the Diagnoses tab, ranked by doctor confidence.
+          </Text>
+          <View style={[styles.patientBadge, { backgroundColor: "#7C3AED15", borderColor: "#7C3AED30" }]}>
+            <Feather name="shield" size={14} color="#7C3AED" />
+            <Text style={[styles.patientBadgeText, { color: "#7C3AED" }]}>Patient Account</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.logoutBtnLarge, { backgroundColor: C.backgroundTertiary }]}
+            onPress={handleLogout}
+          >
+            <Feather name="log-out" size={16} color={C.textSecondary} />
+            <Text style={[styles.logoutBtnText, { color: C.textSecondary }]}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: C.background }]}
@@ -124,9 +176,15 @@ export default function InputScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={[styles.greeting, { color: C.textMuted }]}>
-            Hello, {user?.name?.split(" ")[0] ?? "Doctor"}
-          </Text>
+          <View style={styles.headerTopRow}>
+            <Text style={[styles.greeting, { color: C.textMuted }]}>
+              Dr. {user?.name?.split(" ")[0] ?? "Doctor"}
+            </Text>
+            <View style={[styles.doctorBadge, { backgroundColor: C.tint + "18" }]}>
+              <Feather name="briefcase" size={10} color={C.tint} />
+              <Text style={[styles.doctorBadgeText, { color: C.tint }]}>Doctor</Text>
+            </View>
+          </View>
           <Text style={[styles.headerTitle, { color: C.text }]}>Clinical Mapper</Text>
         </View>
         <TouchableOpacity onPress={handleLogout} style={[styles.logoutBtn, { backgroundColor: C.backgroundTertiary }]}>
@@ -212,15 +270,15 @@ export default function InputScreen() {
 
       {results.length > 0 && (
         <View style={styles.resultsSection}>
-          <Text style={[styles.resultsTitle, { color: C.text }]}>
-            ICD-11 Matches
-          </Text>
+          <Text style={[styles.resultsTitle, { color: C.text }]}>ICD-11 Matches</Text>
           <Text style={[styles.resultsSubtitle, { color: C.textSecondary }]}>
-            {results.length} results · Tap to confirm & save
+            {results.length} results · Set your confidence & confirm
           </Text>
           {results.map((match, idx) => {
             const isSaved = savedIds.has(match.code);
             const isSavingThis = saving === match.code;
+            const dc = doctorConfidences[match.code] ?? Math.round(match.score * 100);
+            const dcColor = dc >= 70 ? C.success : dc >= 40 ? C.warning : C.danger;
             return (
               <View
                 key={match.code}
@@ -247,18 +305,46 @@ export default function InputScreen() {
                   </View>
                 </View>
 
-                <View style={styles.resultBottom}>
-                  <View style={styles.scoreArea}>
-                    <Text style={[styles.scoreLabel, { color: C.textMuted }]}>Confidence</Text>
-                    <ScoreBar score={match.score} />
+                <View style={styles.aiScoreRow}>
+                  <Text style={[styles.scoreLabel, { color: C.textMuted }]}>AI Confidence</Text>
+                  <ScoreBar score={match.score} />
+                </View>
+
+                <View style={[styles.doctorConfRow, { backgroundColor: C.background, borderRadius: 10, padding: 10 }]}>
+                  <View style={styles.dcHeader}>
+                    <Feather name="briefcase" size={12} color={dcColor} />
+                    <Text style={[styles.dcLabel, { color: C.textMuted }]}>My Confidence</Text>
+                    <Text style={[styles.dcValue, { color: dcColor }]}>{dc}%</Text>
                   </View>
+                  <View style={styles.dcControls}>
+                    {[
+                      { label: "-10", delta: -10 },
+                      { label: "-5", delta: -5 },
+                      { label: "+5", delta: 5 },
+                      { label: "+10", delta: 10 },
+                    ].map(({ label, delta }) => (
+                      <TouchableOpacity
+                        key={label}
+                        style={[styles.dcBtn, { borderColor: C.border, backgroundColor: C.backgroundSecondary }]}
+                        onPress={() => adjustConfidence(match.code, delta)}
+                        disabled={isSaved}
+                      >
+                        <Text style={[styles.dcBtnText, { color: delta > 0 ? C.success : C.danger }]}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={[styles.dcBar, { backgroundColor: C.border }]}>
+                    <View style={[styles.dcFill, { width: `${dc}%` as any, backgroundColor: dcColor }]} />
+                  </View>
+                </View>
+
+                <View style={styles.resultBottom}>
                   <TouchableOpacity
                     style={[
                       styles.saveBtn,
-                      {
-                        backgroundColor: isSaved ? C.success : C.tint,
-                        opacity: isSaved ? 1 : 1,
-                      }
+                      { backgroundColor: isSaved ? C.success : C.tint, flex: 1 }
                     ]}
                     onPress={() => handleSave(match)}
                     disabled={isSaved || isSavingThis}
@@ -267,19 +353,15 @@ export default function InputScreen() {
                     {isSavingThis ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Feather name={isSaved ? "check" : "save"} size={16} color="#fff" />
+                      <View style={styles.saveBtnInner}>
+                        <Feather name={isSaved ? "check" : "save"} size={15} color="#fff" />
+                        <Text style={styles.saveBtnText}>
+                          {isSaved ? "Saved as FHIR" : "Confirm & Save"}
+                        </Text>
+                      </View>
                     )}
                   </TouchableOpacity>
                 </View>
-
-                {isSaved && (
-                  <View style={[styles.savedBanner, { backgroundColor: "#E8FAF5" }]}>
-                    <Feather name="check-circle" size={12} color={C.success} />
-                    <Text style={[styles.savedText, { color: C.success }]}>
-                      Saved as FHIR record
-                    </Text>
-                  </View>
-                )}
               </View>
             );
           })}
@@ -312,9 +394,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
   },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   greeting: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
+  },
+  doctorBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  doctorBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
   },
   headerTitle: {
     fontSize: 24,
@@ -410,9 +509,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
-  resultsSection: {
-    gap: 10,
-  },
+  resultsSection: { gap: 10 },
   resultsTitle: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
@@ -462,13 +559,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     lineHeight: 20,
   },
-  resultBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  scoreArea: {
-    flex: 1,
+  aiScoreRow: {
     gap: 6,
   },
   scoreLabel: {
@@ -476,24 +567,66 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     letterSpacing: 0.3,
   },
-  saveBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+  doctorConfRow: {
+    gap: 8,
   },
-  savedBanner: {
+  dcHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    padding: 8,
-    borderRadius: 8,
   },
-  savedText: {
-    fontSize: 12,
+  dcLabel: {
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
+    flex: 1,
+  },
+  dcValue: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+  },
+  dcControls: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  dcBtn: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  dcBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  dcBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  dcFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  resultBottom: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  saveBtn: {
+    height: 42,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveBtnInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  saveBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
   emptyState: {
     alignItems: "center",
@@ -517,5 +650,52 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 280,
     lineHeight: 20,
+  },
+  patientIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  patientTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+  patientSubtitle: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    maxWidth: 280,
+    lineHeight: 22,
+  },
+  patientBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  patientBadgeText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  logoutBtnLarge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  logoutBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
   },
 });

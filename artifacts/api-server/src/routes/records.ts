@@ -1,13 +1,13 @@
 import { Router, type IRouter, type Response } from "express";
 import { db, recordsTable, usersTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth, type AuthRequest } from "../middlewares/auth.js";
+import { requireAuth, requireDoctor, type AuthRequest } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 
-router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
+router.post("/", requireDoctor, async (req: AuthRequest, res: Response) => {
   try {
-    const { input_text, selected_icd, icd_description, confidence_score } = req.body;
+    const { input_text, selected_icd, icd_description, confidence_score, doctor_confidence } = req.body;
     if (!input_text || !selected_icd || !icd_description || confidence_score === undefined) {
       res.status(400).json({ error: "Missing required fields" });
       return;
@@ -24,6 +24,10 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
           display: icd_description
         }]
       },
+      extension: [{
+        url: "doctor-confidence",
+        valueInteger: doctor_confidence ?? null
+      }],
       recordedDate: new Date().toISOString()
     };
 
@@ -33,13 +37,13 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
       selected_icd,
       icd_description,
       confidence_score,
+      doctor_confidence: typeof doctor_confidence === "number" ? doctor_confidence : null,
       fhir_json,
     }).returning();
 
     res.status(201).json({
       ...record,
       created_at: record.created_at.toISOString(),
-      fhir_json: record.fhir_json
     });
   } catch (err) {
     console.error("Save record error:", err);
@@ -50,17 +54,44 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const records = await db.select()
-      .from(recordsTable)
-      .where(eq(recordsTable.user_id, userId))
-      .orderBy(desc(recordsTable.created_at));
+    const role = req.userRole;
 
-    res.json({
-      records: records.map(r => ({
-        ...r,
-        created_at: r.created_at.toISOString(),
-      }))
-    });
+    if (role === "patient") {
+      const records = await db.select({
+        id: recordsTable.id,
+        user_id: recordsTable.user_id,
+        input_text: recordsTable.input_text,
+        selected_icd: recordsTable.selected_icd,
+        icd_description: recordsTable.icd_description,
+        confidence_score: recordsTable.confidence_score,
+        doctor_confidence: recordsTable.doctor_confidence,
+        fhir_json: recordsTable.fhir_json,
+        created_at: recordsTable.created_at,
+        doctor_name: usersTable.name,
+      })
+        .from(recordsTable)
+        .leftJoin(usersTable, eq(recordsTable.user_id, usersTable.id))
+        .orderBy(desc(recordsTable.doctor_confidence));
+
+      res.json({
+        records: records.map(r => ({
+          ...r,
+          created_at: r.created_at.toISOString(),
+        }))
+      });
+    } else {
+      const records = await db.select()
+        .from(recordsTable)
+        .where(eq(recordsTable.user_id, userId))
+        .orderBy(desc(recordsTable.created_at));
+
+      res.json({
+        records: records.map(r => ({
+          ...r,
+          created_at: r.created_at.toISOString(),
+        }))
+      });
+    }
   } catch (err) {
     console.error("Get history error:", err);
     res.status(500).json({ error: "Internal server error" });

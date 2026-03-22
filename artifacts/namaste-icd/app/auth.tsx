@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, type UserRole } from "@/context/AuthContext";
 import Colors from "@/constants/colors";
 
 type AuthMode = "login" | "register";
@@ -26,6 +26,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [role, setRole] = useState<UserRole>("doctor");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -47,7 +48,7 @@ export default function AuthScreen() {
       if (mode === "login") {
         await login(email.trim(), password);
       } else {
-        await register(email.trim(), password, name.trim());
+        await register(email.trim(), password, name.trim(), role);
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace("/(tabs)/input");
@@ -66,6 +67,7 @@ export default function AuthScreen() {
     setEmail("");
     setPassword("");
     setName("");
+    setRole("doctor");
   };
 
   return (
@@ -103,18 +105,51 @@ export default function AuthScreen() {
           </Text>
 
           {mode === "register" && (
-            <View style={[styles.inputGroup, { borderColor: C.border, backgroundColor: C.inputBackground }]}>
-              <Feather name="user" size={18} color={C.textMuted} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { color: C.text, fontFamily: "Inter_400Regular" }]}
-                placeholder="Full name"
-                placeholderTextColor={C.textMuted}
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-                returnKeyType="next"
-              />
-            </View>
+            <>
+              <View style={styles.roleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleBtn,
+                    { borderColor: role === "doctor" ? C.tint : C.border },
+                    role === "doctor" && { backgroundColor: C.tint + "15" }
+                  ]}
+                  onPress={() => setRole("doctor")}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="briefcase" size={18} color={role === "doctor" ? C.tint : C.textMuted} />
+                  <Text style={[styles.roleLabel, { color: role === "doctor" ? C.tint : C.textMuted }]}>
+                    Doctor
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.roleBtn,
+                    { borderColor: role === "patient" ? "#7C3AED" : C.border },
+                    role === "patient" && { backgroundColor: "#7C3AED15" }
+                  ]}
+                  onPress={() => setRole("patient")}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="user" size={18} color={role === "patient" ? "#7C3AED" : C.textMuted} />
+                  <Text style={[styles.roleLabel, { color: role === "patient" ? "#7C3AED" : C.textMuted }]}>
+                    Patient
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.inputGroup, { borderColor: C.border, backgroundColor: C.inputBackground }]}>
+                <Feather name="user" size={18} color={C.textMuted} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, { color: C.text, fontFamily: "Inter_400Regular" }]}
+                  placeholder="Full name"
+                  placeholderTextColor={C.textMuted}
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
+            </>
           )}
 
           <View style={[styles.inputGroup, { borderColor: C.border, backgroundColor: C.inputBackground }]}>
@@ -166,7 +201,7 @@ export default function AuthScreen() {
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Text style={styles.submitButtonText}>
-                {mode === "login" ? "Sign In" : "Create Account"}
+                {mode === "login" ? "Sign In" : `Create ${role === "patient" ? "Patient" : "Doctor"} Account`}
               </Text>
             )}
           </TouchableOpacity>
@@ -184,7 +219,7 @@ export default function AuthScreen() {
         <View style={styles.demoHint}>
           <Feather name="info" size={12} color={C.textMuted} />
           <Text style={[styles.demoText, { color: C.textMuted }]}>
-            Demo: use any email & password to register
+            Doctors diagnose · Patients view ranked results
           </Text>
         </View>
       </ScrollView>
@@ -245,6 +280,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     marginBottom: 8,
+  },
+  roleRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  roleBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  roleLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   inputGroup: {
     flexDirection: "row",

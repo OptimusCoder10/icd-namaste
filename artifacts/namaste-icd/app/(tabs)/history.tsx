@@ -15,25 +15,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { useApi } from "@/context/ApiContext";
+import { useAuth } from "@/context/AuthContext";
+import { useApi, type RecordItem } from "@/context/ApiContext";
 import { ScoreBar } from "@/components/ScoreBar";
 import Colors from "@/constants/colors";
 
-interface RecordItem {
-  id: number;
-  user_id: number;
-  input_text: string;
-  selected_icd: string;
-  icd_description: string;
-  confidence_score: number;
-  fhir_json: object;
-  created_at: string;
-}
-
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const { getHistory } = useApi();
   const C = Colors.light;
+
+  const isPatient = user?.role === "patient";
 
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,37 +70,79 @@ export default function HistoryScreen() {
     return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   };
 
-  const renderRecord = ({ item, index }: { item: RecordItem; index: number }) => (
-    <TouchableOpacity
-      style={[styles.recordCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border, shadowColor: C.cardShadow }]}
-      onPress={async () => {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setSelectedRecord(item);
-      }}
-      activeOpacity={0.8}
-    >
-      <View style={styles.cardTop}>
-        <View style={[styles.idxBadge, { backgroundColor: C.badge }]}>
-          <Text style={[styles.idxText, { color: C.badgeText }]}>#{records.length - index}</Text>
-        </View>
-        <View style={styles.dateArea}>
-          <Text style={[styles.dateText, { color: C.textMuted }]}>{formatDate(item.created_at)}</Text>
-          <Text style={[styles.timeText, { color: C.textMuted }]}>{formatTime(item.created_at)}</Text>
-        </View>
-        <Feather name="chevron-right" size={16} color={C.textMuted} />
-      </View>
+  const getDcColor = (dc: number | null) => {
+    if (dc === null || dc === undefined) return C.textMuted;
+    if (dc >= 70) return C.success;
+    if (dc >= 40) return C.warning;
+    return C.danger;
+  };
 
-      <View style={styles.cardMain}>
-        <Text style={[styles.icdCode, { color: C.tint }]}>{item.selected_icd}</Text>
-        <Text style={[styles.icdDesc, { color: C.text }]} numberOfLines={1}>{item.icd_description}</Text>
-        <Text style={[styles.inputText, { color: C.textSecondary }]} numberOfLines={2}>
-          {item.input_text}
-        </Text>
-      </View>
+  const renderRecord = ({ item, index }: { item: RecordItem; index: number }) => {
+    const dc = item.doctor_confidence;
+    const dcColor = getDcColor(dc);
 
-      <ScoreBar score={item.confidence_score} />
-    </TouchableOpacity>
-  );
+    return (
+      <TouchableOpacity
+        style={[styles.recordCard, { backgroundColor: C.backgroundSecondary, borderColor: C.border, shadowColor: C.cardShadow }]}
+        onPress={async () => {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setSelectedRecord(item);
+        }}
+        activeOpacity={0.8}
+      >
+        <View style={styles.cardTop}>
+          {isPatient && dc !== null && dc !== undefined ? (
+            <View style={[styles.rankCircle, { backgroundColor: dcColor + "18", borderColor: dcColor + "40" }]}>
+              <Text style={[styles.rankNum, { color: dcColor }]}>{dc}%</Text>
+            </View>
+          ) : (
+            <View style={[styles.idxBadge, { backgroundColor: C.badge }]}>
+              <Text style={[styles.idxText, { color: C.badgeText }]}>#{records.length - index}</Text>
+            </View>
+          )}
+          <View style={styles.dateArea}>
+            <Text style={[styles.dateText, { color: C.textMuted }]}>{formatDate(item.created_at)}</Text>
+            <Text style={[styles.timeText, { color: C.textMuted }]}>{formatTime(item.created_at)}</Text>
+          </View>
+          {isPatient && item.doctor_name && (
+            <View style={[styles.drBadge, { backgroundColor: C.tint + "12" }]}>
+              <Feather name="briefcase" size={10} color={C.tint} />
+              <Text style={[styles.drName, { color: C.tint }]} numberOfLines={1}>
+                Dr. {item.doctor_name.split(" ")[0]}
+              </Text>
+            </View>
+          )}
+          <Feather name="chevron-right" size={16} color={C.textMuted} />
+        </View>
+
+        <View style={styles.cardMain}>
+          <Text style={[styles.icdCode, { color: C.tint }]}>{item.selected_icd}</Text>
+          <Text style={[styles.icdDesc, { color: C.text }]} numberOfLines={1}>{item.icd_description}</Text>
+          <Text style={[styles.inputText, { color: C.textSecondary }]} numberOfLines={2}>
+            {item.input_text}
+          </Text>
+        </View>
+
+        <View style={styles.scoresRow}>
+          <View style={styles.scoreBlock}>
+            <Text style={[styles.scoreBlockLabel, { color: C.textMuted }]}>AI</Text>
+            <ScoreBar score={item.confidence_score} />
+          </View>
+          {dc !== null && dc !== undefined && (
+            <View style={styles.scoreBlock}>
+              <Text style={[styles.scoreBlockLabel, { color: C.textMuted }]}>Doctor</Text>
+              <View style={styles.dcBarRow}>
+                <View style={[styles.dcBarBg, { backgroundColor: C.border }]}>
+                  <View style={[styles.dcBarFill, { width: `${dc}%` as any, backgroundColor: dcColor }]} />
+                </View>
+                <Text style={[styles.dcPct, { color: dcColor }]}>{dc}%</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
@@ -116,6 +151,11 @@ export default function HistoryScreen() {
       </View>
     );
   }
+
+  const screenTitle = isPatient ? "Diagnoses" : "My Records";
+  const screenSubtitle = isPatient
+    ? `${records.length} diagnosis${records.length !== 1 ? "es" : ""} · ranked by doctor confidence`
+    : `${records.length} FHIR record${records.length !== 1 ? "s" : ""} saved`;
 
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
@@ -132,10 +172,26 @@ export default function HistoryScreen() {
         ]}
         ListHeaderComponent={
           <View style={styles.listHeader}>
-            <Text style={[styles.screenTitle, { color: C.text }]}>Record History</Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.screenTitle, { color: C.text }]}>{screenTitle}</Text>
+              {isPatient && (
+                <View style={[styles.patientTag, { backgroundColor: "#7C3AED15" }]}>
+                  <Feather name="user" size={11} color="#7C3AED" />
+                  <Text style={[styles.patientTagText, { color: "#7C3AED" }]}>Patient</Text>
+                </View>
+              )}
+            </View>
             <Text style={[styles.screenSubtitle, { color: C.textSecondary }]}>
-              {records.length} FHIR record{records.length !== 1 ? "s" : ""} saved
+              {screenSubtitle}
             </Text>
+            {isPatient && records.length > 0 && (
+              <View style={[styles.sortHint, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
+                <Feather name="bar-chart-2" size={12} color={C.textMuted} />
+                <Text style={[styles.sortHintText, { color: C.textMuted }]}>
+                  Sorted by doctor confidence — highest first
+                </Text>
+              </View>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -154,21 +210,21 @@ export default function HistoryScreen() {
           ) : (
             <View style={styles.emptyState}>
               <View style={[styles.emptyIcon, { backgroundColor: C.backgroundTertiary }]}>
-                <Feather name="clock" size={28} color={C.textMuted} />
+                <Feather name={isPatient ? "clipboard" : "clock"} size={28} color={C.textMuted} />
               </View>
-              <Text style={[styles.emptyTitle, { color: C.textSecondary }]}>No records yet</Text>
+              <Text style={[styles.emptyTitle, { color: C.textSecondary }]}>
+                {isPatient ? "No diagnoses yet" : "No records yet"}
+              </Text>
               <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>
-                Confirmed ICD-11 codes will appear here
+                {isPatient
+                  ? "Doctor-confirmed diagnoses will appear here, ranked by confidence"
+                  : "Confirmed ICD-11 codes will appear here"}
               </Text>
             </View>
           )
         }
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={C.tint}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.tint} />
         }
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -203,9 +259,47 @@ export default function HistoryScreen() {
                     <Text style={[styles.fhirText, { color: C.text }]}>{selectedRecord.input_text}</Text>
                   </View>
 
-                  <View style={styles.scoreSection}>
-                    <Text style={[styles.fhirLabel, { color: C.textMuted }]}>CONFIDENCE</Text>
-                    <ScoreBar score={selectedRecord.confidence_score} />
+                  <View style={styles.scoresDetailSection}>
+                    <View style={styles.scoreDetailBlock}>
+                      <Text style={[styles.fhirLabel, { color: C.textMuted }]}>AI CONFIDENCE</Text>
+                      <ScoreBar score={selectedRecord.confidence_score} />
+                    </View>
+
+                    {selectedRecord.doctor_confidence !== null && selectedRecord.doctor_confidence !== undefined && (
+                      <View style={[styles.scoreDetailBlock, { marginTop: 12 }]}>
+                        <Text style={[styles.fhirLabel, { color: C.textMuted }]}>DOCTOR CONFIDENCE</Text>
+                        <View style={styles.dcDetailRow}>
+                          <View style={[styles.dcBigCircle, {
+                            backgroundColor: getDcColor(selectedRecord.doctor_confidence) + "18",
+                            borderColor: getDcColor(selectedRecord.doctor_confidence) + "40"
+                          }]}>
+                            <Text style={[styles.dcBigNum, { color: getDcColor(selectedRecord.doctor_confidence) }]}>
+                              {selectedRecord.doctor_confidence}%
+                            </Text>
+                          </View>
+                          <View style={styles.dcDetailBarWrap}>
+                            <View style={[styles.dcDetailBar, { backgroundColor: C.border }]}>
+                              <View style={[
+                                styles.dcDetailFill,
+                                {
+                                  width: `${selectedRecord.doctor_confidence}%` as any,
+                                  backgroundColor: getDcColor(selectedRecord.doctor_confidence)
+                                }
+                              ]} />
+                            </View>
+                            <Text style={[styles.dcDetailLabel, { color: C.textMuted }]}>
+                              {selectedRecord.doctor_confidence >= 70 ? "High confidence" :
+                               selectedRecord.doctor_confidence >= 40 ? "Moderate confidence" : "Low confidence"}
+                            </Text>
+                          </View>
+                        </View>
+                        {isPatient && selectedRecord.doctor_name && (
+                          <Text style={[styles.drAttr, { color: C.textMuted }]}>
+                            Assessed by Dr. {selectedRecord.doctor_name}
+                          </Text>
+                        )}
+                      </View>
+                    )}
                   </View>
 
                   <View style={[styles.fhirSection, { backgroundColor: C.background }]}>
@@ -232,15 +326,47 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   listContent: { paddingHorizontal: 16, gap: 0 },
-  listHeader: { marginBottom: 16 },
+  listHeader: { marginBottom: 16, gap: 4 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   screenTitle: {
     fontSize: 24,
     fontFamily: "Inter_700Bold",
   },
+  patientTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  patientTagText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
   screenSubtitle: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    marginTop: 4,
+    marginTop: 2,
+  },
+  sortHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 6,
+    alignSelf: "flex-start",
+  },
+  sortHintText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
   },
   recordCard: {
     borderRadius: 14,
@@ -256,6 +382,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  rankCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    flexShrink: 0,
+  },
+  rankNum: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
   },
   idxBadge: {
     paddingHorizontal: 8,
@@ -280,6 +419,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
   },
+  drBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    maxWidth: 100,
+  },
+  drName: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
   cardMain: { gap: 3 },
   icdCode: {
     fontSize: 12,
@@ -295,6 +447,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_400Regular",
     lineHeight: 18,
+  },
+  scoresRow: {
+    gap: 8,
+  },
+  scoreBlock: {
+    gap: 4,
+  },
+  scoreBlockLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  dcBarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dcBarBg: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  dcBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  dcPct: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    width: 36,
+    textAlign: "right",
   },
   emptyState: {
     alignItems: "center",
@@ -353,12 +538,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "Inter_700Bold",
   },
-  closeBtn: {
-    padding: 4,
-  },
-  modalBody: {
-    padding: 20,
-  },
+  closeBtn: { padding: 4 },
+  modalBody: { padding: 20 },
   fhirSection: {
     borderRadius: 12,
     padding: 14,
@@ -385,9 +566,52 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     lineHeight: 20,
   },
-  scoreSection: {
+  scoresDetailSection: {
     marginBottom: 12,
+  },
+  scoreDetailBlock: {
     gap: 8,
+  },
+  dcDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 6,
+  },
+  dcBigCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    flexShrink: 0,
+  },
+  dcBigNum: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
+  dcDetailBarWrap: {
+    flex: 1,
+    gap: 6,
+  },
+  dcDetailBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  dcDetailFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  dcDetailLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+  drAttr: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 6,
   },
   jsonText: {
     fontSize: 11,

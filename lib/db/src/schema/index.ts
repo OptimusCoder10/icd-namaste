@@ -7,6 +7,7 @@ export const usersTable = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   password_hash: text("password_hash").notNull(),
+  role: text("role").notNull().default("doctor"),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -22,6 +23,7 @@ export const recordsTable = pgTable("records", {
   selected_icd: text("selected_icd").notNull(),
   icd_description: text("icd_description").notNull(),
   confidence_score: real("confidence_score").notNull(),
+  doctor_confidence: integer("doctor_confidence"),
   fhir_json: jsonb("fhir_json").notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
