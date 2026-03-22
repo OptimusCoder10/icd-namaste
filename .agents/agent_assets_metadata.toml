@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "5x1I1aqfxvHQuPXkGodfN"
+uri = "file://README.md"
+type = "text"
+title = "NAMASTE-ICD11 — Full Project Documentation"
