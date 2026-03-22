@@ -35,6 +35,7 @@ interface ApiContextType {
     doctor_confidence: number;
   }) => Promise<RecordItem>;
   getHistory: () => Promise<RecordItem[]>;
+  searchRecords: (query: string) => Promise<RecordItem[]>;
 }
 
 const ApiContext = createContext<ApiContextType | null>(null);
@@ -91,8 +92,17 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     return data.records;
   };
 
+  const searchRecords = async (query: string): Promise<RecordItem[]> => {
+    const res = await fetch(`${BASE_URL}/records/search?q=${encodeURIComponent(query)}`, {
+      headers: authHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Search failed");
+    return data.records;
+  };
+
   return (
-    <ApiContext.Provider value={{ predict, saveRecord, getHistory }}>
+    <ApiContext.Provider value={{ predict, saveRecord, getHistory, searchRecords }}>
       {children}
     </ApiContext.Provider>
   );

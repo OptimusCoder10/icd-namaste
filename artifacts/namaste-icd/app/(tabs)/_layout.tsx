@@ -22,6 +22,12 @@ function NativeTabLayout() {
         <Icon sf={{ default: "clock", selected: "clock.fill" }} />
         <Label>{isPatient ? "Diagnoses" : "My Records"}</Label>
       </NativeTabs.Trigger>
+      {isPatient && (
+        <NativeTabs.Trigger name="search">
+          <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
+          <Label>Search</Label>
+        </NativeTabs.Trigger>
+      )}
     </NativeTabs>
   );
 }
@@ -108,6 +114,25 @@ function ClassicTabLayout() {
               <Feather name={isPatient ? "clipboard" : "clock"} size={22} color={color} />
             ),
         }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={
+          isPatient
+            ? {
+                title: "Search",
+                tabBarLabel: "Search",
+                tabBarIcon: ({ color }) =>
+                  isIOS ? (
+                    <SymbolView name="magnifyingglass" tintColor={color} size={24} />
+                  ) : (
+                    <Feather name="search" size={22} color={color} />
+                  ),
+              }
+            : {
+                href: null,
+              }
+        }
       />
     </Tabs>
   );
