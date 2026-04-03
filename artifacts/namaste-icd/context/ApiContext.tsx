@@ -12,9 +12,15 @@ interface PredictResponse {
   ai_available: boolean;
 }
 
+export interface PatientSuggestion {
+  id: number;
+  name: string;
+}
+
 export interface RecordItem {
   id: number;
   user_id: number;
+  patient_id: number | null;
   input_text: string;
   selected_icd: string;
   icd_description: string;
@@ -23,6 +29,7 @@ export interface RecordItem {
   fhir_json: object;
   created_at: string;
   doctor_name?: string;
+  patient_name?: string;
 }
 
 interface ApiContextType {
@@ -33,9 +40,11 @@ interface ApiContextType {
     icd_description: string;
     confidence_score: number;
     doctor_confidence: number;
+    patient_id?: number | null;
   }) => Promise<RecordItem>;
   getHistory: () => Promise<RecordItem[]>;
   searchRecords: (query: string) => Promise<RecordItem[]>;
+  searchPatients: (query: string) => Promise<PatientSuggestion[]>;
 }
 
 const ApiContext = createContext<ApiContextType | null>(null);
@@ -72,6 +81,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     icd_description: string;
     confidence_score: number;
     doctor_confidence: number;
+    patient_id?: number | null;
   }): Promise<RecordItem> => {
     const res = await fetch(`${BASE_URL}/records`, {
       method: "POST",
@@ -101,8 +111,18 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     return data.records;
   };
 
+  const searchPatients = async (query: string): Promise<PatientSuggestion[]> => {
+    if (!query || query.length < 2) return [];
+    const res = await fetch(`${BASE_URL}/patients/search?q=${encodeURIComponent(query)}`, {
+      headers: authHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Patient search failed");
+    return data.patients;
+  };
+
   return (
-    <ApiContext.Provider value={{ predict, saveRecord, getHistory, searchRecords }}>
+    <ApiContext.Provider value={{ predict, saveRecord, getHistory, searchRecords, searchPatients }}>
       {children}
     </ApiContext.Provider>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useAuth } from "@/context/AuthContext";
-import { useApi } from "@/context/ApiContext";
+import { useApi, type PatientSuggestion } from "@/context/ApiContext";
 import { ScoreBar } from "@/components/ScoreBar";
 import Colors from "@/constants/colors";
 
@@ -37,7 +37,7 @@ const EXAMPLE_QUERIES = [
 export default function InputScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
-  const { predict, saveRecord } = useApi();
+  const { predict, saveRecord, searchPatients } = useApi();
   const C = Colors.light;
 
   const isPatient = user?.role === "patient";
@@ -51,6 +51,13 @@ export default function InputScreen() {
   const [error, setError] = useState("");
   const [doctorConfidences, setDoctorConfidences] = useState<Record<string, number>>({});
 
+  const [patientQuery, setPatientQuery] = useState("");
+  const [patientSuggestions, setPatientSuggestions] = useState<PatientSuggestion[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientSuggestion | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [patientSearching, setPatientSearching] = useState(false);
+  const patientDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   const shake = () => {
@@ -60,6 +67,43 @@ export default function InputScreen() {
       Animated.timing(shakeAnim, { toValue: 4, duration: 60, useNativeDriver: true }),
       Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
     ]).start();
+  };
+
+  const handlePatientQueryChange = useCallback((q: string) => {
+    setPatientQuery(q);
+    setSelectedPatient(null);
+    if (patientDebounceRef.current) clearTimeout(patientDebounceRef.current);
+    if (!q || q.length < 2) {
+      setPatientSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    patientDebounceRef.current = setTimeout(async () => {
+      setPatientSearching(true);
+      try {
+        const results = await searchPatients(q);
+        setPatientSuggestions(results);
+        setShowSuggestions(results.length > 0);
+      } catch {
+        setPatientSuggestions([]);
+      } finally {
+        setPatientSearching(false);
+      }
+    }, 350);
+  }, [searchPatients]);
+
+  const handleSelectPatient = (patient: PatientSuggestion) => {
+    setSelectedPatient(patient);
+    setPatientQuery(patient.name);
+    setShowSuggestions(false);
+    setPatientSuggestions([]);
+  };
+
+  const handleClearPatient = () => {
+    setSelectedPatient(null);
+    setPatientQuery("");
+    setPatientSuggestions([]);
+    setShowSuggestions(false);
   };
 
   const handlePredict = async () => {
@@ -101,6 +145,7 @@ export default function InputScreen() {
         icd_description: match.description,
         confidence_score: match.score,
         doctor_confidence: dc,
+        patient_id: selectedPatient?.id ?? null,
       });
       setSavedIds(prev => new Set([...prev, match.code]));
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -194,6 +239,76 @@ export default function InputScreen() {
 
       <View style={[styles.card, { backgroundColor: C.backgroundSecondary, shadowColor: C.cardShadow }]}>
         <View style={styles.cardHeader}>
+          <Feather name="user-check" size={16} color="#7C3AED" />
+          <Text style={[styles.cardLabel, { color: "#7C3AED" }]}>Patient (Optional)</Text>
+        </View>
+        <View style={styles.patientInputWrap}>
+          <View style={[
+            styles.patientInputRow,
+            {
+              borderColor: selectedPatient ? "#7C3AED" : C.border,
+              backgroundColor: C.background,
+            }
+          ]}>
+            <Feather name="search" size={15} color={selectedPatient ? "#7C3AED" : C.textMuted} style={styles.patientSearchIcon} />
+            <TextInput
+              style={[styles.patientInput, { color: C.text }]}
+              placeholder="Search patient by name..."
+              placeholderTextColor={C.textMuted}
+              value={patientQuery}
+              onChangeText={handlePatientQueryChange}
+              fontFamily="Inter_400Regular"
+              returnKeyType="search"
+            />
+            {patientSearching && <ActivityIndicator size="small" color={C.tint} style={styles.patientLoader} />}
+            {selectedPatient && (
+              <TouchableOpacity onPress={handleClearPatient} style={styles.clearBtn}>
+                <Feather name="x" size={14} color={C.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {showSuggestions && patientSuggestions.length > 0 && (
+            <View style={[styles.suggestionsList, { backgroundColor: C.backgroundSecondary, borderColor: C.border, shadowColor: C.cardShadow }]}>
+              {patientSuggestions.map((pt, idx) => (
+                <TouchableOpacity
+                  key={pt.id}
+                  style={[
+                    styles.suggestionItem,
+                    idx < patientSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: C.border }
+                  ]}
+                  onPress={() => handleSelectPatient(pt)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.suggestionAvatar, { backgroundColor: "#7C3AED15" }]}>
+                    <Feather name="user" size={13} color="#7C3AED" />
+                  </View>
+                  <Text style={[styles.suggestionName, { color: C.text }]}>{pt.name}</Text>
+                  <Feather name="chevron-right" size={14} color={C.textMuted} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {selectedPatient && (
+            <View style={[styles.selectedPatientBanner, { backgroundColor: "#7C3AED10", borderColor: "#7C3AED30" }]}>
+              <Feather name="check-circle" size={14} color="#7C3AED" />
+              <Text style={[styles.selectedPatientText, { color: "#7C3AED" }]}>
+                Diagnosing: {selectedPatient.name}
+              </Text>
+            </View>
+          )}
+
+          {!selectedPatient && !patientQuery && (
+            <Text style={[styles.patientHint, { color: C.textMuted }]}>
+              Link to a patient so they can see this diagnosis in their portal
+            </Text>
+          )}
+        </View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: C.backgroundSecondary, shadowColor: C.cardShadow }]}>
+        <View style={styles.cardHeader}>
           <Feather name="edit-3" size={16} color={C.tint} />
           <Text style={[styles.cardLabel, { color: C.tint }]}>NAMASTE / Clinical Terms</Text>
         </View>
@@ -273,6 +388,7 @@ export default function InputScreen() {
           <Text style={[styles.resultsTitle, { color: C.text }]}>ICD-11 Matches</Text>
           <Text style={[styles.resultsSubtitle, { color: C.textSecondary }]}>
             {results.length} results · Set your confidence & confirm
+            {selectedPatient ? ` · for ${selectedPatient.name}` : ""}
           </Text>
           {results.map((match, idx) => {
             const isSaved = savedIds.has(match.code);
@@ -446,6 +562,73 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  patientInputWrap: { gap: 8 },
+  patientInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 8,
+  },
+  patientSearchIcon: { flexShrink: 0 },
+  patientInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+  },
+  patientLoader: { flexShrink: 0 },
+  clearBtn: {
+    padding: 4,
+  },
+  suggestionsList: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  suggestionAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  suggestionName: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+  },
+  selectedPatientBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  selectedPatientText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    flex: 1,
+  },
+  patientHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
   },
   textArea: {
     borderWidth: 1.5,

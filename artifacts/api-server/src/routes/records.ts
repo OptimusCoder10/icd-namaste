@@ -1,22 +1,34 @@
 import { Router, type IRouter, type Response } from "express";
 import { db, recordsTable, usersTable } from "@workspace/db";
-import { eq, desc, ilike, or } from "drizzle-orm";
+import { eq, desc, ilike, or, and } from "drizzle-orm";
 import { requireAuth, requireDoctor, type AuthRequest } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 
+const patientAlias = usersTable;
+
 router.post("/", requireDoctor, async (req: AuthRequest, res: Response) => {
   try {
-    const { input_text, selected_icd, icd_description, confidence_score, doctor_confidence } = req.body;
+    const { input_text, selected_icd, icd_description, confidence_score, doctor_confidence, patient_id } = req.body;
     if (!input_text || !selected_icd || !icd_description || confidence_score === undefined) {
       res.status(400).json({ error: "Missing required fields" });
       return;
     }
 
     const userId = req.userId!;
+
+    let linkedPatientId: number | null = null;
+    if (patient_id && typeof patient_id === "number") {
+      const [pt] = await db.select({ id: usersTable.id, role: usersTable.role })
+        .from(usersTable)
+        .where(and(eq(usersTable.id, patient_id), eq(usersTable.role, "patient")))
+        .limit(1);
+      if (pt) linkedPatientId = pt.id;
+    }
+
     const fhir_json = {
       resourceType: "Condition",
-      subject: { reference: `Patient/${userId}` },
+      subject: { reference: `Patient/${linkedPatientId ?? userId}` },
       code: {
         coding: [{
           system: "ICD-11",
@@ -33,6 +45,7 @@ router.post("/", requireDoctor, async (req: AuthRequest, res: Response) => {
 
     const [record] = await db.insert(recordsTable).values({
       user_id: userId,
+      patient_id: linkedPatientId,
       input_text,
       selected_icd,
       icd_description,
@@ -53,15 +66,28 @@ router.post("/", requireDoctor, async (req: AuthRequest, res: Response) => {
 
 router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!;
+    const role = req.userRole;
     const q = String(req.query["q"] ?? "").trim();
     if (!q) {
       res.json({ records: [] });
       return;
     }
     const pattern = `%${q}%`;
+    const textFilter = or(
+      ilike(recordsTable.selected_icd, pattern),
+      ilike(recordsTable.icd_description, pattern),
+      ilike(recordsTable.input_text, pattern)
+    );
+
+    const whereClause = role === "patient"
+      ? and(textFilter, eq(recordsTable.patient_id, userId))
+      : textFilter;
+
     const records = await db.select({
       id: recordsTable.id,
       user_id: recordsTable.user_id,
+      patient_id: recordsTable.patient_id,
       input_text: recordsTable.input_text,
       selected_icd: recordsTable.selected_icd,
       icd_description: recordsTable.icd_description,
@@ -73,13 +99,7 @@ router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
     })
       .from(recordsTable)
       .leftJoin(usersTable, eq(recordsTable.user_id, usersTable.id))
-      .where(
-        or(
-          ilike(recordsTable.selected_icd, pattern),
-          ilike(recordsTable.icd_description, pattern),
-          ilike(recordsTable.input_text, pattern)
-        )
-      )
+      .where(whereClause)
       .orderBy(desc(recordsTable.doctor_confidence));
 
     res.json({
@@ -103,6 +123,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       const records = await db.select({
         id: recordsTable.id,
         user_id: recordsTable.user_id,
+        patient_id: recordsTable.patient_id,
         input_text: recordsTable.input_text,
         selected_icd: recordsTable.selected_icd,
         icd_description: recordsTable.icd_description,
@@ -114,6 +135,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       })
         .from(recordsTable)
         .leftJoin(usersTable, eq(recordsTable.user_id, usersTable.id))
+        .where(eq(recordsTable.patient_id, userId))
         .orderBy(desc(recordsTable.doctor_confidence));
 
       res.json({
@@ -123,8 +145,21 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
         }))
       });
     } else {
-      const records = await db.select()
+      const records = await db.select({
+        id: recordsTable.id,
+        user_id: recordsTable.user_id,
+        patient_id: recordsTable.patient_id,
+        input_text: recordsTable.input_text,
+        selected_icd: recordsTable.selected_icd,
+        icd_description: recordsTable.icd_description,
+        confidence_score: recordsTable.confidence_score,
+        doctor_confidence: recordsTable.doctor_confidence,
+        fhir_json: recordsTable.fhir_json,
+        created_at: recordsTable.created_at,
+        patient_name: patientAlias.name,
+      })
         .from(recordsTable)
+        .leftJoin(patientAlias, eq(recordsTable.patient_id, patientAlias.id))
         .where(eq(recordsTable.user_id, userId))
         .orderBy(desc(recordsTable.created_at));
 

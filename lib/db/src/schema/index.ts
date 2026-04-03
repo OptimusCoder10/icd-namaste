@@ -19,6 +19,7 @@ export const icdCodesTable = pgTable("icd_codes", {
 export const recordsTable = pgTable("records", {
   id: serial("id").primaryKey(),
   user_id: integer("user_id").notNull().references(() => usersTable.id),
+  patient_id: integer("patient_id").references(() => usersTable.id),
   input_text: text("input_text").notNull(),
   selected_icd: text("selected_icd").notNull(),
   icd_description: text("icd_description").notNull(),

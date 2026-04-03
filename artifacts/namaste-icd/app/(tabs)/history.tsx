@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -23,21 +24,26 @@ import Colors from "@/constants/colors";
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { getHistory } = useApi();
+  const { getHistory, searchRecords } = useApi();
   const C = Colors.light;
 
   const isPatient = user?.role === "patient";
 
+  const [allRecords, setAllRecords] = useState<RecordItem[]>([]);
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<RecordItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const searchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchHistory = useCallback(async () => {
     try {
       setError("");
       const data = await getHistory();
+      setAllRecords(data);
       setRecords(data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load history";
@@ -51,13 +57,40 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
+      setSearchQuery("");
       fetchHistory();
     }, [fetchHistory])
   );
 
   const handleRefresh = () => {
     setRefreshing(true);
+    setSearchQuery("");
     fetchHistory();
+  };
+
+  const handleSearch = (q: string) => {
+    setSearchQuery(q);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!q.trim()) {
+      setRecords(allRecords);
+      return;
+    }
+    searchDebounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await searchRecords(q.trim());
+        setRecords(results);
+      } catch {
+        const lower = q.toLowerCase();
+        setRecords(allRecords.filter(r =>
+          r.selected_icd.toLowerCase().includes(lower) ||
+          r.icd_description.toLowerCase().includes(lower) ||
+          r.input_text.toLowerCase().includes(lower)
+        ));
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
   };
 
   const formatDate = (iso: string) => {
@@ -112,6 +145,14 @@ export default function HistoryScreen() {
               </Text>
             </View>
           )}
+          {!isPatient && item.patient_name && (
+            <View style={[styles.patientBadge, { backgroundColor: "#7C3AED12" }]}>
+              <Feather name="user" size={10} color="#7C3AED" />
+              <Text style={[styles.patientBadgeName, { color: "#7C3AED" }]} numberOfLines={1}>
+                {item.patient_name.split(" ")[0]}
+              </Text>
+            </View>
+          )}
           <Feather name="chevron-right" size={16} color={C.textMuted} />
         </View>
 
@@ -152,10 +193,10 @@ export default function HistoryScreen() {
     );
   }
 
-  const screenTitle = isPatient ? "Diagnoses" : "My Records";
+  const screenTitle = isPatient ? "My Diagnoses" : "My Records";
   const screenSubtitle = isPatient
-    ? `${records.length} diagnosis${records.length !== 1 ? "es" : ""} · ranked by doctor confidence`
-    : `${records.length} FHIR record${records.length !== 1 ? "s" : ""} saved`;
+    ? `${allRecords.length} diagnosis${allRecords.length !== 1 ? "es" : ""} · ranked by doctor confidence`
+    : `${allRecords.length} FHIR record${allRecords.length !== 1 ? "s" : ""} saved`;
 
   return (
     <View style={[styles.container, { backgroundColor: C.background }]}>
@@ -184,11 +225,40 @@ export default function HistoryScreen() {
             <Text style={[styles.screenSubtitle, { color: C.textSecondary }]}>
               {screenSubtitle}
             </Text>
-            {isPatient && records.length > 0 && (
+
+            <View style={[styles.searchBar, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
+              <Feather name="search" size={15} color={C.textMuted} />
+              <TextInput
+                style={[styles.searchInput, { color: C.text }]}
+                placeholder={isPatient ? "Search your diagnoses..." : "Search records..."}
+                placeholderTextColor={C.textMuted}
+                value={searchQuery}
+                onChangeText={handleSearch}
+                fontFamily="Inter_400Regular"
+                returnKeyType="search"
+              />
+              {searching && <ActivityIndicator size="small" color={C.tint} />}
+              {searchQuery.length > 0 && !searching && (
+                <TouchableOpacity onPress={() => handleSearch("")}>
+                  <Feather name="x" size={14} color={C.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {isPatient && allRecords.length > 0 && !searchQuery && (
               <View style={[styles.sortHint, { backgroundColor: C.backgroundSecondary, borderColor: C.border }]}>
                 <Feather name="bar-chart-2" size={12} color={C.textMuted} />
                 <Text style={[styles.sortHintText, { color: C.textMuted }]}>
                   Sorted by doctor confidence — highest first
+                </Text>
+              </View>
+            )}
+
+            {isPatient && allRecords.length > 0 && (
+              <View style={[styles.privacyNote, { backgroundColor: "#7C3AED08", borderColor: "#7C3AED20" }]}>
+                <Feather name="lock" size={11} color="#7C3AED" />
+                <Text style={[styles.privacyNoteText, { color: "#7C3AED" }]}>
+                  Only showing diagnoses linked to you by a doctor
                 </Text>
               </View>
             )}
@@ -207,6 +277,16 @@ export default function HistoryScreen() {
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>
+          ) : searchQuery ? (
+            <View style={styles.emptyState}>
+              <View style={[styles.emptyIcon, { backgroundColor: C.backgroundTertiary }]}>
+                <Feather name="search" size={28} color={C.textMuted} />
+              </View>
+              <Text style={[styles.emptyTitle, { color: C.textSecondary }]}>No results found</Text>
+              <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>
+                Try different keywords or clear the search
+              </Text>
+            </View>
           ) : (
             <View style={styles.emptyState}>
               <View style={[styles.emptyIcon, { backgroundColor: C.backgroundTertiary }]}>
@@ -217,7 +297,7 @@ export default function HistoryScreen() {
               </Text>
               <Text style={[styles.emptySubtitle, { color: C.textMuted }]}>
                 {isPatient
-                  ? "Doctor-confirmed diagnoses will appear here, ranked by confidence"
+                  ? "When a doctor links a diagnosis to you, it will appear here"
                   : "Confirmed ICD-11 codes will appear here"}
               </Text>
             </View>
@@ -228,7 +308,7 @@ export default function HistoryScreen() {
         }
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        scrollEnabled={records.length > 0}
+        scrollEnabled={records.length > 0 || !!searchQuery}
       />
 
       <Modal
@@ -248,6 +328,16 @@ export default function HistoryScreen() {
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {selectedRecord && (
                 <>
+                  {!isPatient && selectedRecord.patient_name && (
+                    <View style={[styles.fhirSection, { backgroundColor: "#7C3AED0A" }]}>
+                      <Text style={[styles.fhirLabel, { color: "#7C3AED" }]}>PATIENT</Text>
+                      <View style={styles.patientNameRow}>
+                        <Feather name="user" size={16} color="#7C3AED" />
+                        <Text style={[styles.patientNameText, { color: C.text }]}>{selectedRecord.patient_name}</Text>
+                      </View>
+                    </View>
+                  )}
+
                   <View style={[styles.fhirSection, { backgroundColor: C.background }]}>
                     <Text style={[styles.fhirLabel, { color: C.textMuted }]}>ICD-11 CODE</Text>
                     <Text style={[styles.fhirCode, { color: C.tint }]}>{selectedRecord.selected_icd}</Text>
@@ -326,7 +416,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   listContent: { paddingHorizontal: 16, gap: 0 },
-  listHeader: { marginBottom: 16, gap: 4 },
+  listHeader: { marginBottom: 16, gap: 8 },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -353,6 +443,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginTop: 4,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+  },
   sortHint: {
     flexDirection: "row",
     alignItems: "center",
@@ -361,12 +466,25 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    marginTop: 6,
     alignSelf: "flex-start",
   },
   sortHintText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
+  },
+  privacyNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+  },
+  privacyNoteText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
   },
   recordCard: {
     borderRadius: 14,
@@ -429,6 +547,19 @@ const styles = StyleSheet.create({
     maxWidth: 100,
   },
   drName: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
+  patientBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    maxWidth: 100,
+  },
+  patientBadgeName: {
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
   },
@@ -565,6 +696,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     lineHeight: 20,
+  },
+  patientNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  patientNameText: {
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   scoresDetailSection: {
     marginBottom: 12,

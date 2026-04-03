@@ -37,8 +37,10 @@ lib/
 - `POST /api/auth/login` — JWT login
 - `POST /api/auth/register` — Register new user
 - `POST /api/predict` — Predict ICD-11 codes from clinical text (auth required)
-- `POST /api/records` — Save a confirmed FHIR record (auth required)
-- `GET /api/records` — Get history of saved records (auth required)
+- `POST /api/records` — Save a confirmed FHIR record with optional patient_id (doctor only)
+- `GET /api/records` — Get history; doctors see their records with patient_name, patients see only records linked to them
+- `GET /api/records/search?q=` — Search records; patients only search within their own linked records
+- `GET /api/patients/search?q=` — Search patients by name for doctor linking (doctor only, returns id+name only)
 
 ## AI Service
 
@@ -49,15 +51,24 @@ lib/
 
 ## Database Schema
 
-- `users` — id, email, name, password_hash, created_at
-- `records` — id, user_id, input_text, selected_icd, icd_description, confidence_score, fhir_json (JSONB), created_at
+- `users` — id, email, name, password_hash, role, created_at
+- `records` — id, user_id, patient_id (FK nullable), input_text, selected_icd, icd_description, confidence_score, doctor_confidence, fhir_json (JSONB), created_at
 - `icd_codes` — code, description (reference table)
+
+## Doctor-Patient Matching
+
+- Doctors can optionally link a diagnosis to a registered patient by searching their name
+- Patient names are returned for search (id + name only, no email for privacy)
+- When a patient logs in, they only see diagnoses explicitly linked to them via patient_id
+- Patient search in history only searches within their own records (ICD codes/descriptions, no patient names exposed)
+- Doctors see patient name badge on each record in their history
+- FHIR JSON uses the linked patient's ID as the subject reference
 
 ## Mobile App Screens
 
-1. **Auth** — Login / Register with JWT
-2. **Diagnose (Input)** — Enter symptoms, view ICD-11 results, confirm & save to FHIR
-3. **History** — View all saved FHIR records, tap to view full FHIR JSON
+1. **Auth** — Login / Register with JWT, role selection (Doctor / Patient)
+2. **Diagnose (Input)** — Doctor: search & link patient, enter symptoms, view ICD-11 results, set confidence & save to FHIR. Patient: portal redirect screen.
+3. **History** — Doctor: records with patient name badges, searchable. Patient: only their own linked diagnoses, searchable by ICD code/description, ranked by doctor confidence.
 
 ## FHIR Output Format
 
