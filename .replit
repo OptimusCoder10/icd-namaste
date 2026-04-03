@@ -26,17 +26,49 @@ author = "agent"
 task = "workflow.run"
 args = "AI Service"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "NAMASTE-ICD11 App"
+
 [[workflows.workflow]]
 name = "AI Service"
 author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python3 /home/runner/workspace/ai-service/main.py"
 waitForPort = 8001
 
+[[workflows.workflow]]
+name = "API Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
+waitForPort = 8080
+
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "NAMASTE-ICD11 App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/artifacts/namaste-icd && PORT=20284 EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN EXPO_PUBLIC_REPL_ID=$REPL_ID REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN pnpm exec expo start --localhost --port 20284"
+waitForPort = 20284
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -65,3 +97,9 @@ externalPort = 8081
 [[ports]]
 localPort = 20284
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "namaste-icd11-jwt-secret-replit-2024"
+AI_SERVICE_URL = "http://localhost:8001"
