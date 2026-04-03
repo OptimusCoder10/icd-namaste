@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
 import { useAuth } from "@/context/AuthContext";
 import { useApi, type PatientSuggestion } from "@/context/ApiContext";
 import { ScoreBar } from "@/components/ScoreBar";
@@ -37,7 +39,7 @@ const EXAMPLE_QUERIES = [
 export default function InputScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
-  const { predict, saveRecord, searchPatients } = useApi();
+  const { predict, saveRecord, searchPatients, extractText } = useApi();
   const C = Colors.light;
 
   const isPatient = user?.role === "patient";
@@ -57,6 +59,9 @@ export default function InputScreen() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [patientSearching, setPatientSearching] = useState(false);
   const patientDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [extracting, setExtracting] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
@@ -104,6 +109,91 @@ export default function InputScreen() {
     setPatientQuery("");
     setPatientSuggestions([]);
     setShowSuggestions(false);
+  };
+
+  const handleFileExtract = async (file: { uri: string; name: string; mimeType: string }) => {
+    setExtracting(true);
+    setUploadedFileName(file.name);
+    setError("");
+    try {
+      const extracted = await extractText(file);
+      setText(extracted);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Extraction failed";
+      setError(msg);
+      setUploadedFileName(null);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/jpeg", "image/png", "image/tiff"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
+      await handleFileExtract({
+        uri: asset.uri,
+        name: asset.name || "document",
+        mimeType: asset.mimeType || "application/octet-stream",
+      });
+    } catch (err) {
+      Alert.alert("Error", "Could not open document picker");
+    }
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission required", "Please allow access to your photo library.");
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+        quality: 0.9,
+        allowsEditing: false,
+      });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
+      const ext = (asset.uri.split(".").pop() || "jpg").toLowerCase();
+      const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", tiff: "image/tiff", tif: "image/tiff" };
+      await handleFileExtract({
+        uri: asset.uri,
+        name: `photo.${ext}`,
+        mimeType: mimeMap[ext] || "image/jpeg",
+      });
+    } catch {
+      Alert.alert("Error", "Could not open image library");
+    }
+  };
+
+  const handleCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission required", "Please allow camera access.");
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.9,
+        allowsEditing: false,
+      });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const asset = result.assets[0];
+      await handleFileExtract({
+        uri: asset.uri,
+        name: "camera_photo.jpg",
+        mimeType: "image/jpeg",
+      });
+    } catch {
+      Alert.alert("Error", "Could not open camera");
+    }
   };
 
   const handlePredict = async () => {
@@ -303,6 +393,68 @@ export default function InputScreen() {
             <Text style={[styles.patientHint, { color: C.textMuted }]}>
               Link to a patient so they can see this diagnosis in their portal
             </Text>
+          )}
+        </View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: C.backgroundSecondary, shadowColor: C.cardShadow }]}>
+        <View style={styles.cardHeader}>
+          <Feather name="upload" size={16} color="#0891B2" />
+          <Text style={[styles.cardLabel, { color: "#0891B2" }]}>Upload Document (Optional)</Text>
+        </View>
+
+        {extracting ? (
+          <View style={[styles.uploadLoading, { backgroundColor: "#0891B208" }]}>
+            <ActivityIndicator size="small" color="#0891B2" />
+            <Text style={[styles.uploadLoadingText, { color: "#0891B2" }]}>Extracting text from document…</Text>
+          </View>
+        ) : uploadedFileName ? (
+          <View style={[styles.uploadedBanner, { backgroundColor: "#0891B210", borderColor: "#0891B230" }]}>
+            <Feather name="check-circle" size={14} color="#0891B2" />
+            <Text style={[styles.uploadedBannerText, { color: "#0891B2" }]} numberOfLines={1}>
+              {uploadedFileName}
+            </Text>
+            <TouchableOpacity onPress={() => { setUploadedFileName(null); setText(""); }}>
+              <Feather name="x" size={14} color="#0891B2" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={[styles.uploadHint, { color: C.textMuted }]}>
+            Extract text from a scanned report, lab result, or clinical paper
+          </Text>
+        )}
+
+        <View style={styles.uploadBtnsRow}>
+          <TouchableOpacity
+            style={[styles.uploadBtn, { backgroundColor: "#0891B215", borderColor: "#0891B230" }]}
+            onPress={handlePickDocument}
+            disabled={extracting}
+            activeOpacity={0.75}
+          >
+            <Feather name="file-text" size={18} color="#0891B2" />
+            <Text style={[styles.uploadBtnText, { color: "#0891B2" }]}>PDF</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.uploadBtn, { backgroundColor: "#7C3AED15", borderColor: "#7C3AED30" }]}
+            onPress={handlePickImage}
+            disabled={extracting}
+            activeOpacity={0.75}
+          >
+            <Feather name="image" size={18} color="#7C3AED" />
+            <Text style={[styles.uploadBtnText, { color: "#7C3AED" }]}>Gallery</Text>
+          </TouchableOpacity>
+
+          {Platform.OS !== "web" && (
+            <TouchableOpacity
+              style={[styles.uploadBtn, { backgroundColor: C.backgroundTertiary, borderColor: C.border }]}
+              onPress={handleCamera}
+              disabled={extracting}
+              activeOpacity={0.75}
+            >
+              <Feather name="camera" size={18} color={C.textSecondary} />
+              <Text style={[styles.uploadBtnText, { color: C.textSecondary }]}>Camera</Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -833,6 +985,55 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 280,
     lineHeight: 20,
+  },
+  uploadLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  uploadLoadingText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  uploadedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  uploadedBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  uploadHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+  },
+  uploadBtnsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  uploadBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  uploadBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   patientIcon: {
     width: 80,

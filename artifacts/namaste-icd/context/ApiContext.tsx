@@ -45,6 +45,7 @@ interface ApiContextType {
   getHistory: () => Promise<RecordItem[]>;
   searchRecords: (query: string) => Promise<RecordItem[]>;
   searchPatients: (query: string) => Promise<PatientSuggestion[]>;
+  extractText: (file: { uri: string; name: string; mimeType: string }) => Promise<string>;
 }
 
 const ApiContext = createContext<ApiContextType | null>(null);
@@ -121,8 +122,25 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     return data.patients;
   };
 
+  const extractText = async (file: { uri: string; name: string; mimeType: string }): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
+    const res = await fetch(`${BASE_URL}/extract-text`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Text extraction failed");
+    return data.text as string;
+  };
+
   return (
-    <ApiContext.Provider value={{ predict, saveRecord, getHistory, searchRecords, searchPatients }}>
+    <ApiContext.Provider value={{ predict, saveRecord, getHistory, searchRecords, searchPatients, extractText }}>
       {children}
     </ApiContext.Provider>
   );

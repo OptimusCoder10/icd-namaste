@@ -1,8 +1,9 @@
 import os
+import io
 import json
 import numpy as np
 import faiss
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from typing import List
 import uvicorn
@@ -221,6 +222,45 @@ def predict(req: PredictRequest) -> List[IcdMatch]:
             print(f"AI prediction failed: {e}, falling back to keyword search")
     kw_results = keyword_search(req.text, top_k=5)
     return [IcdMatch(**r) for r in kw_results]
+
+@app.post("/extract-text")
+async def extract_text(file: UploadFile = File(...)):
+    content = await file.read()
+    filename = (file.filename or "").lower()
+    content_type = (file.content_type or "").lower()
+
+    extracted = ""
+
+    if "pdf" in content_type or filename.endswith(".pdf"):
+        try:
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                pages_text = []
+                for page in pdf.pages:
+                    t = page.extract_text()
+                    if t:
+                        pages_text.append(t.strip())
+                extracted = "\n\n".join(pages_text)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"PDF extraction failed: {str(e)}")
+    elif any(x in content_type for x in ["image/", "jpeg", "jpg", "png", "tiff", "bmp", "webp"]) or \
+         any(filename.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"]):
+        try:
+            import pytesseract
+            from PIL import Image
+            img = Image.open(io.BytesIO(content))
+            extracted = pytesseract.image_to_string(img, lang="eng")
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Image OCR failed: {str(e)}")
+    else:
+        raise HTTPException(status_code=415, detail="Unsupported file type. Upload a PDF or image (JPEG, PNG, TIFF).")
+
+    extracted = extracted.strip()
+    if not extracted:
+        raise HTTPException(status_code=422, detail="No text could be extracted from the file.")
+
+    return {"text": extracted, "chars": len(extracted)}
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("AI_SERVICE_PORT", 8001))
