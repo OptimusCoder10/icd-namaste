@@ -2,15 +2,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# System deps: curl (healthcheck) + Tesseract OCR engine
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir fastapi uvicorn pydantic numpy faiss-cpu
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir transformers huggingface-hub || \
-    echo "WARNING: torch/transformers install failed, keyword fallback will be used"
+# Optional: BioBERT / transformers (large download - skipped for keyword fallback mode)
+# Uncomment the next two lines to enable full AI embeddings:
+# RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+# RUN pip install --no-cache-dir transformers huggingface-hub
 
 COPY main.py .
 

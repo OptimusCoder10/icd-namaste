@@ -5,3 +5,8 @@ node_modules
 *.log
 dist
 build
+.expo
+static-build
+artifacts/namaste-icd/.metro-cache
+**/.cache
+.local

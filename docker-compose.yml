@@ -1,5 +1,20 @@
 version: "3.9"
 
+# ─────────────────────────────────────────────────────────────────
+# NAMASTE-ICD11 — Local Docker Stack
+#
+# Quick start:
+#   docker compose up --build
+#
+# Then open:
+#   Web app  → http://localhost:3000
+#   API      → http://localhost:8080
+#   AI OCR   → http://localhost:8001
+#
+# To use a different API host (e.g. a remote server):
+#   EXPO_PUBLIC_DOMAIN=my-server.example.com docker compose up --build
+# ─────────────────────────────────────────────────────────────────
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -15,7 +30,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U namaste -d namaste_icd"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   ai-service:
     build:
@@ -24,13 +39,14 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - AI_SERVICE_PORT=8001
+      AI_SERVICE_PORT: "8001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
 
   api-server:
     build:
@@ -39,27 +55,31 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - PORT=8080
-      - DATABASE_URL=postgresql://namaste:namaste123@postgres:5432/namaste_icd
-      - JWT_SECRET=namaste-icd11-local-secret
-      - AI_SERVICE_URL=http://ai-service:8001
-      - NODE_ENV=production
+      PORT: "8080"
+      DATABASE_URL: postgresql://namaste:namaste123@postgres:5432/namaste_icd
+      JWT_SECRET: namaste-icd11-local-secret-change-me
+      AI_SERVICE_URL: http://ai-service:8001
+      NODE_ENV: development
     depends_on:
       postgres:
         condition: service_healthy
       ai-service:
         condition: service_started
+    restart: unless-stopped
 
   expo-web:
     build:
       context: .
       dockerfile: Dockerfile.expo
+      args:
+        # The browser talks directly to the API — must be reachable from the user's machine
+        EXPO_PUBLIC_DOMAIN: "localhost:8080"
+        EXPO_PUBLIC_API_URL: "http://localhost:8080"
     ports:
       - "3000:3000"
-    environment:
-      - EXPO_PUBLIC_DOMAIN=localhost:8080
     depends_on:
       - api-server
+    restart: unless-stopped
 
 volumes:
   postgres_data:
