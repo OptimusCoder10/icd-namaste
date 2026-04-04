@@ -16,7 +16,6 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import * as DocumentPicker from "expo-document-picker";
 import { useAuth } from "@/context/AuthContext";
 import { useApi, type PatientSuggestion } from "@/context/ApiContext";
 import { ScoreBar } from "@/components/ScoreBar";
@@ -126,24 +125,6 @@ export default function InputScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setExtracting(false);
-    }
-  };
-
-  const handlePickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/jpeg", "image/png", "image/tiff"],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets || result.assets.length === 0) return;
-      const asset = result.assets[0];
-      await handleFileExtract({
-        uri: asset.uri,
-        name: asset.name || "document",
-        mimeType: asset.mimeType || "application/octet-stream",
-      });
-    } catch (err) {
-      Alert.alert("Error", "Could not open document picker");
     }
   };
 
@@ -399,8 +380,8 @@ export default function InputScreen() {
 
       <View style={[styles.card, { backgroundColor: C.backgroundSecondary, shadowColor: C.cardShadow }]}>
         <View style={styles.cardHeader}>
-          <Feather name="upload" size={16} color="#0891B2" />
-          <Text style={[styles.cardLabel, { color: "#0891B2" }]}>Upload Document (Optional)</Text>
+          <Feather name="camera" size={16} color="#0891B2" />
+          <Text style={[styles.cardLabel, { color: "#0891B2" }]}>Scan Clinical Image (Optional)</Text>
         </View>
 
         {extracting ? (
@@ -420,21 +401,11 @@ export default function InputScreen() {
           </View>
         ) : (
           <Text style={[styles.uploadHint, { color: C.textMuted }]}>
-            Extract text from a scanned report, lab result, or clinical paper
+            Take a photo or select an image to extract clinical text automatically
           </Text>
         )}
 
         <View style={styles.uploadBtnsRow}>
-          <TouchableOpacity
-            style={[styles.uploadBtn, { backgroundColor: "#0891B215", borderColor: "#0891B230" }]}
-            onPress={handlePickDocument}
-            disabled={extracting}
-            activeOpacity={0.75}
-          >
-            <Feather name="file-text" size={18} color="#0891B2" />
-            <Text style={[styles.uploadBtnText, { color: "#0891B2" }]}>PDF</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.uploadBtn, { backgroundColor: "#7C3AED15", borderColor: "#7C3AED30" }]}
             onPress={handlePickImage}
@@ -445,17 +416,15 @@ export default function InputScreen() {
             <Text style={[styles.uploadBtnText, { color: "#7C3AED" }]}>Gallery</Text>
           </TouchableOpacity>
 
-          {Platform.OS !== "web" && (
-            <TouchableOpacity
-              style={[styles.uploadBtn, { backgroundColor: C.backgroundTertiary, borderColor: C.border }]}
-              onPress={handleCamera}
-              disabled={extracting}
-              activeOpacity={0.75}
-            >
-              <Feather name="camera" size={18} color={C.textSecondary} />
-              <Text style={[styles.uploadBtnText, { color: C.textSecondary }]}>Camera</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.uploadBtn, { backgroundColor: "#0891B215", borderColor: "#0891B230" }]}
+            onPress={handleCamera}
+            disabled={extracting}
+            activeOpacity={0.75}
+          >
+            <Feather name="camera" size={18} color="#0891B2" />
+            <Text style={[styles.uploadBtnText, { color: "#0891B2" }]}>Camera</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

@@ -1,28 +1,27 @@
 import { Router, type IRouter, type Response } from "express";
 import multer from "multer";
 import { requireDoctor, type AuthRequest } from "../middlewares/auth.js";
-import FormData from "form-data";
 
 const router: IRouter = Router();
 const AI_SERVICE_URL = process.env["AI_SERVICE_URL"] || "http://localhost:8001";
+
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/tiff",
+  "image/bmp",
+  "image/webp",
+];
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = [
-      "application/pdf",
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/tiff",
-      "image/bmp",
-      "image/webp",
-    ];
-    if (allowed.includes(file.mimetype)) {
+    if (ALLOWED_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Unsupported file type. Upload a PDF or image (JPEG, PNG, TIFF)."));
+      cb(new Error("Unsupported file type. Upload an image (JPEG, PNG, TIFF, BMP, WebP)."));
     }
   },
 });
@@ -34,15 +33,11 @@ router.post(
   async (req: AuthRequest, res: Response) => {
     try {
       if (!req.file) {
-        res.status(400).json({ error: "No file uploaded" });
+        res.status(400).json({ error: "No image uploaded" });
         return;
       }
 
-      const form = new FormData();
-      form.append("file", req.file.buffer, {
-        filename: req.file.originalname || "upload",
-        contentType: req.file.mimetype,
-      });
+      const image_b64 = req.file.buffer.toString("base64");
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30000);
@@ -51,8 +46,11 @@ router.post(
       try {
         aiRes = await fetch(`${AI_SERVICE_URL}/extract-text`, {
           method: "POST",
-          body: form as unknown as BodyInit,
-          headers: form.getHeaders(),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image_b64,
+            filename: req.file.originalname || "upload.jpg",
+          }),
           signal: controller.signal,
         });
       } finally {
@@ -60,6 +58,7 @@ router.post(
       }
 
       const data = await aiRes.json() as { text?: string; chars?: number; detail?: string };
+
       if (!aiRes.ok) {
         res.status(aiRes.status).json({ error: data.detail || "Extraction failed" });
         return;
