@@ -110,12 +110,12 @@ export default function InputScreen() {
     setShowSuggestions(false);
   };
 
-  const handleFileExtract = async (file: { uri: string; name: string; mimeType: string }) => {
+  const handleImageExtract = async (base64: string, mimeType: string, displayName: string) => {
     setExtracting(true);
-    setUploadedFileName(file.name);
+    setUploadedFileName(displayName);
     setError("");
     try {
-      const extracted = await extractText(file);
+      const extracted = await extractText(base64, mimeType);
       setText(extracted);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
@@ -137,18 +137,16 @@ export default function InputScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: "images",
-        quality: 0.9,
+        quality: 0.85,
         allowsEditing: false,
+        base64: true,
       });
       if (result.canceled || !result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
-      const ext = (asset.uri.split(".").pop() || "jpg").toLowerCase();
-      const mimeMap: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", tiff: "image/tiff", tif: "image/tiff" };
-      await handleFileExtract({
-        uri: asset.uri,
-        name: `photo.${ext}`,
-        mimeType: mimeMap[ext] || "image/jpeg",
-      });
+      if (!asset.base64) { Alert.alert("Error", "Could not read image data"); return; }
+      const mimeType = (asset as any).mimeType || "image/jpeg";
+      const displayName = (asset as any).fileName || "photo.jpg";
+      await handleImageExtract(asset.base64, mimeType, displayName);
     } catch {
       Alert.alert("Error", "Could not open image library");
     }
@@ -162,16 +160,14 @@ export default function InputScreen() {
     }
     try {
       const result = await ImagePicker.launchCameraAsync({
-        quality: 0.9,
+        quality: 0.85,
         allowsEditing: false,
+        base64: true,
       });
       if (result.canceled || !result.assets || result.assets.length === 0) return;
       const asset = result.assets[0];
-      await handleFileExtract({
-        uri: asset.uri,
-        name: "camera_photo.jpg",
-        mimeType: "image/jpeg",
-      });
+      if (!asset.base64) { Alert.alert("Error", "Could not read image data"); return; }
+      await handleImageExtract(asset.base64, "image/jpeg", "camera_photo.jpg");
     } catch {
       Alert.alert("Error", "Could not open camera");
     }
