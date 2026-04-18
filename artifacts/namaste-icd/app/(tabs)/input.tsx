@@ -137,7 +137,7 @@ export default function InputScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: "images",
-        quality: 0.85,
+        quality: 0.6,
         allowsEditing: false,
         base64: true,
       });
@@ -160,7 +160,7 @@ export default function InputScreen() {
     }
     try {
       const result = await ImagePicker.launchCameraAsync({
-        quality: 0.85,
+        quality: 0.6,
         allowsEditing: false,
         base64: true,
       });
