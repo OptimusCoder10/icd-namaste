@@ -10,6 +10,7 @@ version: "3.9"
 #   Web app  → http://localhost:3000
 #   API      → http://localhost:8080
 #   AI OCR   → http://localhost:8001
+#   pgAdmin  → http://localhost:5050
 #
 # To use a different API host (e.g. a remote server):
 #   EXPO_PUBLIC_DOMAIN=my-server.example.com docker compose up --build
@@ -79,6 +80,17 @@ services:
       - "3000:3000"
     depends_on:
       - api-server
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
     restart: unless-stopped
 
 volumes:
