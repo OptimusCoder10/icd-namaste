@@ -1,6 +1,33 @@
 import os
 import io
 import json
+import subprocess
+import sys
+
+# Ensure ML packages are installed (survives container restarts without uv conflicts)
+_ML_PACKAGES = [
+    "torch --index-url https://download.pytorch.org/whl/cpu",
+    "transformers",
+    "tokenizers",
+    "sentencepiece",
+    "protobuf",
+    "huggingface-hub",
+]
+
+def _ensure_packages():
+    missing = []
+    for pkg in ["torch", "transformers", "tokenizers", "sentencepiece", "protobuf", "huggingface_hub"]:
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        print(f"Installing missing ML packages: {missing}")
+        for spec in _ML_PACKAGES:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-q"] + spec.split())
+
+_ensure_packages()
+
 import numpy as np
 import faiss
 from fastapi import FastAPI, UploadFile, File, HTTPException
