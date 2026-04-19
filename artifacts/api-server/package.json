@@ -20,6 +20,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5",
     "form-data": "^4.0.5",
+    "jimp-compact": "0.16.1-2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "tesseract.js": "^7.0.0"
