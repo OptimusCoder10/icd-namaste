@@ -13,6 +13,12 @@ dependencies = [
     "pytesseract>=0.3.13",
     "python-multipart>=0.0.22",
     "uvicorn>=0.42.0",
+    "torch>=2.0.0",
+    "transformers>=4.40.0",
+    "tokenizers>=0.19.0",
+    "sentencepiece>=0.2.0",
+    "protobuf>=4.0.0",
+    "huggingface-hub>=0.20.0",
 ]
 
 [[tool.uv.index]]

@@ -11,12 +11,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Install base packages
+RUN pip install --no-cache-dir \
+    fastapi==0.115.0 \
+    uvicorn==0.32.0 \
+    pydantic==2.9.2 \
+    "numpy<2" \
+    faiss-cpu \
+    pytesseract \
+    Pillow \
+    sentencepiece \
+    protobuf \
+    huggingface-hub
 
-# Optional: BioBERT / transformers (large download - skipped for keyword fallback mode)
-# Uncomment the next two lines to enable full AI embeddings:
-# RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-# RUN pip install --no-cache-dir transformers huggingface-hub
+# Install PyTorch CPU (smaller than full CUDA build)
+RUN pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install transformers + tokenizers after torch
+RUN pip install --no-cache-dir transformers tokenizers
 
 COPY main.py .
 

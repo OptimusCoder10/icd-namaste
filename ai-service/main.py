@@ -133,10 +133,10 @@ def load_model_and_index():
     global model, tokenizer, index, icd_embeddings, USE_AI
     try:
         print("Loading BioBERT model...")
-        from transformers import AutoTokenizer, AutoModel
+        from transformers import BertTokenizer, BertModel
         import torch
-        tokenizer = AutoTokenizer.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
-        model = AutoModel.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
+        tokenizer = BertTokenizer.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
+        model = BertModel.from_pretrained("dmis-lab/biobert-base-cased-v1.1")
         model.eval()
         print("BioBERT loaded. Building FAISS index...")
         descriptions = [item["description"] for item in ICD_DATA]
