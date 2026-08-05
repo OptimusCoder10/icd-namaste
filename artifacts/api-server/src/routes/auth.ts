@@ -5,7 +5,10 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 const router: IRouter = Router();
-const JWT_SECRET = process.env["JWT_SECRET"] || "namaste-icd11-secret-key-2024";
+const JWT_SECRET = process.env["JWT_SECRET"];
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is not set");
+}
 
 router.post("/login", async (req: Request, res: Response) => {
   try {
